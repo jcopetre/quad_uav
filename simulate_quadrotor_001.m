@@ -109,6 +109,10 @@ else
     fprintf('  Model already loaded\n');
 end
 
+% SET INTERPRETED EXECUTION MODE (bypasses code generation)
+set_param(model_name, 'SimulationMode', 'normal');
+fprintf('  Set to interpreted execution mode\n');
+
 %% Step 4: Run Simulation
 fprintf('\nStep 4/5: Running Simulink simulation...\n');
 
