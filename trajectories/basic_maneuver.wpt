@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "name": "Basic Test Flight",
+    "description": "Takeoff, maneuver, and land",
+    "created": "2025-10-08",
+    "vehicle": "quadrotor_500g"
+  },
+  "waypoints": [
+    {"label": "start", "time": 0, "x": 0, "y": 0, "z": 0, "yaw": 0},
+    {"label": "climb", "time": 2, "x": 0, "y": 0, "z": 1, "yaw": null},
+    {"label": "forward", "time": 5, "x": 2, "y": 0, "z": 1, "yaw": null},
+    {"label": "turn_right", "time": 8, "x": 2, "y": 2, "z": 1, "yaw": 1.57},
+    {"label": "return", "time": 11, "x": 0, "y": 2, "z": 1.5, "yaw": 3.14},
+    {"label": "hover", "time": 14, "x": 0, "y": 0, "z": 1, "yaw": null},
+    {"label": "land", "time": 17, "x": 0, "y": 0, "z": 0, "yaw": 0}
+  ]
+}
