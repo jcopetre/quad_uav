@@ -5,6 +5,8 @@
 
 clear; close all; clc;
 
+addpath('../utilities/');
+
 fprintf('========================================\n');
 fprintf('Quadrotor Quick Test Simulation\n');
 fprintf('========================================\n\n');
@@ -55,8 +57,7 @@ tspan = [0, trajectory.time(end)];
 options = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
 
 tic;
-[t, x] = ode45(@(t,x) quadrotor_closed_loop_dynamics(t, x, params, trajectory), ...
-               tspan, x0, options);
+[t, x, u_log] = simulate_quadrotor(x0, tspan, params, trajectory);
 sim_time = toc;
 
 fprintf('  Simulation complete: %.3f seconds (%.0f time steps)\n', ...
@@ -145,14 +146,26 @@ legend('V_x', 'V_y', 'V_z', 'Location', 'best');
 sgtitle('Quadrotor LQR Control - Quick Test', 'FontSize', 16, 'FontWeight', 'bold');
 
 %% Summary
+metrics = compute_performance_metrics(t, x, trajectory, params);
+
 fprintf('\n========================================\n');
 fprintf('SIMULATION COMPLETE!\n');
 fprintf('========================================\n');
 fprintf('Total time:        %.1f seconds\n', t(end));
-fprintf('Position RMSE:     %.4f m\n', norm(rmse_pos));
-fprintf('Max altitude:      %.3f m\n', max(x(:,3)));
-fprintf('Max roll angle:    %.2f deg\n', max(abs(rad2deg(x(:,4)))));
-fprintf('Max pitch angle:   %.2f deg\n', max(abs(rad2deg(x(:,5)))));
+
+% Display standard performance metrics
+fprintf('\n=== PERFORMANCE METRICS ===\n');
+fprintf('Position RMSE:     %.4f m (%.1f%% in bounds)\n', ...
+        metrics.tracking.rmse_position, metrics.tracking.time_in_bounds);
+fprintf('Attitude RMSE:     %.2f deg\n', rad2deg(metrics.tracking.rmse_attitude));
+fprintf('Max roll/pitch:    %.2f / %.2f deg\n', ...
+        rad2deg(metrics.tracking.max_roll), rad2deg(metrics.tracking.max_pitch));
+if metrics.success.overall
+    fprintf('Overall success:   YES\n');
+else
+    fprintf('Overall success:   NO\n');
+end
+fprintf('Summary score:     %.3f (lower is better)\n', metrics.summary_weighted);
 fprintf('========================================\n\n');
 
-fprintf('SUCCESS! The quadrotor is flying! 🚁\n\n');
+fprintf('SUCCESS! The quadrotor is flying! \n\n');

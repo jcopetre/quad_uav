@@ -35,6 +35,7 @@ dirs_to_add = {
     'trajectories';
     'control';
     'dynamics';
+    'utilities';
 };
 
 %% Add directories to path

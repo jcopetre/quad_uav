@@ -18,6 +18,7 @@ function test_waypoints()
     test_metadata_extraction();
     test_invalid_file();
     test_missing_fields();
+    test_out_of_order_waypoints();
     
     fprintf('\n===================================\n');
     fprintf('All Tests Passed! ✓\n\n');
@@ -180,6 +181,37 @@ function test_missing_fields()
         assert(contains(ME.message, 'missing', 'IgnoreCase', true) || ...
                contains(ME.message, 'field', 'IgnoreCase', true), ...
                'Should report missing field');
+    end
+    
+    fprintf('PASS\n');
+end
+
+%% Test 8: Out-of-Order Waypoint Detection
+function test_out_of_order_waypoints()
+    fprintf('Test 8: Out-of-order waypoint detection... ');
+    
+    % Create temporary file with out-of-order times
+    test_dir = fileparts(mfilename('fullpath'));
+    temp_file = fullfile(test_dir, 'temp_out_of_order.wpt');
+    
+    % Write waypoints with non-monotonic times
+    fid = fopen(temp_file, 'w');
+    fprintf(fid, '{"waypoints": [');
+    fprintf(fid, '{"time": 0, "x": 0, "y": 0, "z": 0},');
+    fprintf(fid, '{"time": 5, "x": 1, "y": 0, "z": 0},');
+    fprintf(fid, '{"time": 3, "x": 2, "y": 0, "z": 0}');  % Out of order!
+    fprintf(fid, ']}');
+    fclose(fid);
+    
+    % Try to load - should fail
+    try
+        load_waypoints(temp_file);
+        delete(temp_file);  % Cleanup
+        error('Should have thrown error for out-of-order times');
+    catch ME
+        delete(temp_file);  % Cleanup
+        assert(contains(ME.message, 'increasing', 'IgnoreCase', true), ...
+               'Should report non-monotonic times');
     end
     
     fprintf('PASS\n');

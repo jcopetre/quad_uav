@@ -48,17 +48,17 @@ function x_dot = quadrotor_closed_loop_dynamics(t, x, params, trajectory)
 % Author: Trey Copeland, jcopetre@gmail.com
 % Date: 2025-10-09
 
-%% Step 1: Get reference state at current time
-x_ref = get_reference_state(t, trajectory);
-
-%% Step 2: Compute LQR control input
-u = compute_lqr_control(x, x_ref, params);
-
-%% Step 3: Evaluate nonlinear dynamics
-x_dot = quadrotor_dynamics_pure(x, u, params);
-
-%% Optional: Store control for post-processing
-% (If needed later, can use global variable or nested function)
-% This would require restructuring to return u alongside x_dot
+    %% Step 1: Get reference state at current time
+    x_ref = get_reference_state(t, trajectory);
+    
+    %% Step 2: Compute LQR control input
+    u = compute_lqr_control(x, x_ref, params);
+    
+    %% Step 3: Evaluate nonlinear dynamics
+    x_dot = quadrotor_dynamics_pure(x, u, params);
+    
+    %% Optional: Store control for post-processing
+    % (If needed later, can use global variable or nested function)
+    % This would require restructuring to return u alongside x_dot
 
 end
