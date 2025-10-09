@@ -31,7 +31,7 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
 ├── trajectories/
 │   ├── load_waypoints.m                 [Waypoint file loader]
 │   ├── generate_trajectory.m            [Minimum-snap trajectory generation]
-│   └── *.csv                            [Waypoint definition files]
+│   └── *.wpt                            [Waypoint definition files (JSON)]
 │
 ├── control/
 │   ├── compute_lqr_control.m            [LQR control law implementation]
@@ -54,7 +54,7 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                 simulate_quadrotor_pure.m                   │
-│                     [Main Orchestrator]                      │
+│                     [Main Orchestrator]                     │
 └────────┬──────────────────────────────────────────┬─────────┘
          │                                          │
          ↓                                          ↓
@@ -63,10 +63,10 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
 │ 6dof.m              │                   │ generate_        │
 │                     │                   │ trajectory       │
 │ • Physical params   │                   │                  │
-│ • Linearized model  │                   │ • CSV in         │
+│ • Linearized model  │                   │ • JSON file in   │
 │ • LQR gains (K)     │                   │ • Smooth path    │
 └──────────┬──────────┘                   │   out            │
-           │                               └────────┬─────────┘
+           │                              └────────┬─────────┘
            │                                       │
            └───────────────┬───────────────────────┘
                            │
@@ -97,8 +97,8 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
    │   trajectory         │      │ • u = u₀ - K*e       │
    │ • Return x_ref       │      │ • Apply saturation   │
    └──────────┬───────────┘      └──────────┬───────────┘
-              │                              │
-              └──────────────┬───────────────┘
+              │                             │
+              └──────────────┬──────────────┘
                              │
                              ↓
                   ┌─────────────────────────┐
@@ -136,7 +136,7 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
        └─> Return: params struct
 
 2. TRAJECTORY GENERATION
-   └─> load_waypoints(wpt_file)
+   └─> load_waypoints(wpt file)
        ├─> Parse .wpt file (JSON format)
        ├─> Load metadata and waypoints
        ├─> Handle null for auto yaw calculation
@@ -144,6 +144,7 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
        └─> Return structure with labels and waypoint data
    
    └─> generate_trajectory(wpt, params)
+       ├─> Accept JSON structure OR matrix input
        ├─> Process yaw: explicit values or auto from velocity
        ├─> 5th-order polynomial interpolation
        ├─> Compute: pos, vel, acc, yaw
@@ -180,9 +181,9 @@ x = [x, y, z, φ, θ, ψ, ẋ, ẏ, ż, p, q, r]ᵀ  (12 states)
 
 Where:
   Position:        x, y, z           [m]
-  Attitude:        φ, θ, ψ            [rad] (roll, pitch, yaw)
+  Attitude:        φ, θ, ψ           [rad] (roll, pitch, yaw)
   Linear Velocity: ẋ, ẏ, ż           [m/s]
-  Angular Rate:    p, q, r            [rad/s]
+  Angular Rate:    p, q, r           [rad/s]
 ```
 
 ## 🎮 Control Input Definition
@@ -246,7 +247,7 @@ Control Effort:    145.67
 
 **Method 1: Waypoint Files (Recommended)**
 
-Create a `.wpt` file in `./trajectories/`:
+Create a `.wpt` file (JSON format) in `./trajectories/`:
 
 ```json
 {
@@ -271,35 +272,52 @@ Create a `.wpt` file in `./trajectories/`:
 Load in simulation:
 ```matlab
 % In simulate_quadrotor_pure.m
-waypoints = load_waypoints('./trajectories/my_trajectory.wpt');
-trajectory = generate_trajectory(waypoints, params);
+wpt = load_waypoints('./trajectories/my_trajectory.wpt');
+trajectory = generate_trajectory(wpt, params);
 ```
 
-**Waypoint File Format:**
-- **label**: Descriptive name for waypoint (for documentation)
-- **x, y, z**: Position in meters
-- **yaw**: Heading angle in radians
-- **time**: Time to reach waypoint in seconds
+**Waypoint File Format (.wpt using JSON):**
+- **metadata** (optional): Trajectory information for documentation
+  - name: Descriptive trajectory name
+  - description: Purpose or details
+  - created: Date created
+  - vehicle: Target vehicle identifier
+- **waypoints** (required): Array of waypoint objects
+  - **label**: Waypoint identifier used in outputs and plot annotations
+  - **time**: Time to reach waypoint in seconds
+  - **x, y, z**: Position in meters
+  - **yaw**: Heading angle in radians, or `null` for auto-calculation
+
+**Yaw Behavior:**
+- **Explicit value** (e.g., `1.57`): UAV will orient to specified heading
+- **null** (in JSON): UAV will automatically face direction of travel (computed from velocity vector)
+- Useful for camera pointing, inspection tasks, or wind compensation
 
 **Method 2: Direct Definition (Quick Testing)**
 
-For rapid prototyping, define inline:
+For rapid prototyping, define inline as a matrix:
 ```matlab
 % In simulate_quadrotor_pure.m
+% Format: [time, x, y, z, yaw]
 waypoints = [
-    0,   0,   0,   0,   0;      % [time, x, y, z, yaw]
-    3,   2,   0,   1,   NaN;
+    0,   0,   0,   0,   0;
+    3,   2,   0,   1,   NaN;    % NaN for auto yaw in MATLAB arrays
     10,  0,   0,   0,   0;
 ];
 trajectory = generate_trajectory(waypoints, params);
 ```
 
-**Benefits of CSV Files:**
+**Note:** Use `NaN` for auto-yaw in MATLAB arrays, `null` in JSON files.
+
+**Benefits of .wpt JSON Files:**
 - ✅ Reuse trajectories across experiments
 - ✅ Version control trajectory designs separately
 - ✅ Easy batch processing for Monte Carlo
-- ✅ Documentation: trajectory becomes data artifact
+- ✅ Self-documenting with metadata
+- ✅ Native MATLAB support (jsondecode)
+- ✅ Comments and optional fields
 - ✅ Non-programmers can define flight paths
+- ✅ Clear separation of data and code
 
 ### Tune LQR Controller
 ```matlab
@@ -307,6 +325,10 @@ trajectory = generate_trajectory(waypoints, params);
 Q_custom = diag([200 200 200 20 20 2 20 20 20 2 2 0.2]);
 R_custom = diag([0.5 2 2 2]);
 params = quadrotor_linear_6dof(Q_custom, R_custom);
+
+% Load trajectory
+wpt = load_waypoints('./trajectories/my_trajectory.wpt');
+trajectory = generate_trajectory(wpt, params);
 ```
 
 #### Understanding Q and R Matrices
@@ -347,14 +369,23 @@ R = diag([rF rτφ rτθ rτψ])
 % Aggressive tracking (racing drone)
 Q_aggressive = diag([200 200 200 20 20 5 20 20 20 2 2 1]);
 R_aggressive = diag([0.01 0.5 0.5 0.5]);
+params = quadrotor_linear_6dof(Q_aggressive, R_aggressive);
+wpt = load_waypoints('./trajectories/racing_track.wpt');
+trajectory = generate_trajectory(wpt, params);
 
 % Smooth operation (aerial photography)
 Q_smooth = diag([50 50 100 5 5 2 5 5 10 0.5 0.5 0.1]);
 R_smooth = diag([1 5 5 5]);
+params = quadrotor_linear_6dof(Q_smooth, R_smooth);
+wpt = load_waypoints('./trajectories/photo_survey.wpt');
+trajectory = generate_trajectory(wpt, params);
 
 % Energy efficient (long flight time)
 Q_efficient = diag([80 80 100 8 8 1 8 8 10 1 1 0.2]);
 R_efficient = diag([5 2 2 2]);
+params = quadrotor_linear_6dof(Q_efficient, R_efficient);
+wpt = load_waypoints('./trajectories/patrol_route.wpt');
+trajectory = generate_trajectory(wpt, params);
 ```
 
 The optimal Q and R depend on your application requirements, vehicle constraints, and trajectory characteristics. Experimentation and Monte Carlo analysis help identify robust tuning.
@@ -433,14 +464,12 @@ Where K is computed from the linearized system using MATLAB's `lqr()` function.
 | `simulate_quadrotor_pure.m` | Main orchestrator, runs simulation |
 | `quadrotor_linear_6dof.m` | Vehicle model and LQR design |
 | `load_waypoints.m` | Waypoint file loader (JSON .wpt format) |
-| `generate_trajectory.m` | Minimum-snap trajectory generation |
+| `generate_trajectory.m` | Minimum-snap trajectory generation (accepts JSON or matrix) |
 | `compute_lqr_control.m` | LQR control law |
 | `get_reference_state.m` | Reference state lookup |
 | `quadrotor_closed_loop_dynamics.m` | ODE wrapper function |
 | `quadrotor_dynamics_pure.m` | Nonlinear 6DOF dynamics |
-| `*.wpt` (trajectories) | Waypoint definitions |
-
-**Total: ~535 lines of clean, documented code**
+| `*.wpt` (trajectories) | Waypoint definitions (JSON format) |
 
 ---
 
@@ -471,25 +500,3 @@ Where K is computed from the linearized system using MATLAB's `lqr()` function.
 - **Trajectory Optimization**: Mellinger, D., & Kumar, V. (2011). *Minimum Snap Trajectory Generation and Control for Quadrotors*
 
 ---
-
-## 📧 Project Info
-
-**Type**: Master's Thesis Project  
-**Goal**: Demonstrate competency in control systems and provide discussion-worthy results  
-**Status**: Active Development  
-**Architecture**: Pure MATLAB (Simulink port optional for hardware deployment)
-
----
-
-## 🎉 Advantages of This Implementation
-
-✅ **Fast iteration** - change and run in seconds  
-✅ **Easy debugging** - full MATLAB tooling  
-✅ **Clean code** - publication quality  
-✅ **Flexible** - easy to extend and modify  
-✅ **Reproducible** - no compilation, consistent results  
-✅ **Thesis-ready** - generates all necessary figures and metrics  
-
----
-
-*Last Updated: [Current Date]*
