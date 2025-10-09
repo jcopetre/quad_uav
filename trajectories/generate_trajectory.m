@@ -161,26 +161,6 @@ end
 trajectory.roll = zeros(n_points, 1);
 trajectory.pitch = zeros(n_points, 1);
 
-g = params.g;
-
-for i = 1:n_points
-    ax = trajectory.acceleration(i, 1);
-    ay = trajectory.acceleration(i, 2);
-    
-    % Desired pitch from forward acceleration (small angle approximation)
-    % tan(theta) ≈ theta ≈ ax/g for small angles
-    trajectory.pitch(i) = asin(max(-0.5, min(0.5, ax / g)));  % Clamp to ±30°
-    
-    % Desired roll from lateral acceleration
-    % tan(phi) ≈ -ay / (g * cos(theta))
-    cos_theta = cos(trajectory.pitch(i));
-    if abs(cos_theta) > 0.1  % Avoid division by zero
-        trajectory.roll(i) = asin(max(-0.5, min(0.5, -ay / (g * cos_theta))));
-    else
-        trajectory.roll(i) = 0;
-    end
-end
-
 %% Assemble attitude vector
 trajectory.attitude = [trajectory.roll, trajectory.pitch, trajectory.yaw];
 
