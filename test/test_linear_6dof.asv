@@ -8,8 +8,8 @@ function test_linear_6dof()
     fprintf('==========================================\n\n');
     
     % Setup test environment
-    setup_test_environment();
-    Constants.TOL
+    [setup_test_environment();
+    
     % Run all test cases
     test_default_parameters();
     test_custom_weights();
@@ -26,7 +26,7 @@ end
 %% Test 1: Default Parameters
 function test_default_parameters()
     fprintf('Test 1: Default parameters... ');
-
+    
     params = quadrotor_linear_6dof([], [], false);  % Quiet mode
     
     % Check physical parameters exist and are positive
@@ -100,7 +100,7 @@ function test_lqr_stability()
     eigs_sorted = sort(eigs_cl);
     poles_sorted = sort(params.poles);
     max_diff = max(abs(eigs_sorted - poles_sorted));
-    assert(max_diff < Constants.TOL, ...
+    assert(max_diff < TOL, ...
            sprintf('Stored poles differ by %.2e', max_diff));
     
     fprintf('PASS (max real part: %.2f)\n', max(real(eigs_cl)));
@@ -117,9 +117,9 @@ function test_hover_equilibrium()
     u_hover = params.u_hover;
     
     % Check hover thrust is correct
-    assert(abs(u_hover(1) - params.m * params.g) < Constants.TOL, ...
+    assert(abs(u_hover(1) - params.m * params.g) < TOL, ...
            'Hover thrust incorrect');
-    assert(all(abs(u_hover(2:4)) < Constants.TOL), ...
+    assert(all(abs(u_hover(2:4)) < TOL), ...
            'Hover torques should be zero');
     
     % CORRECTED: Linearized model represents deviation dynamics
@@ -144,16 +144,16 @@ function test_hover_equilibrium()
     % in the z-dynamics. Let's verify the structure is correct instead:
     
     % Verify that A matrix has the correct coupling
-    assert(abs(params.A(7,5) + params.g) < Constants.TOL, 'x-acceleration coupling incorrect');
-    assert(abs(params.A(8,4) - params.g) < Constants.TOL, 'y-acceleration coupling incorrect');
+    assert(abs(params.A(7,5) + params.g) < TOL, 'x-acceleration coupling incorrect');
+    assert(abs(params.A(8,4) - params.g) < TOL, 'y-acceleration coupling incorrect');
     
     % Verify B matrix maps thrust correctly
-    assert(abs(params.B(9,1) - 1/params.m) < Constants.TOL, 'Thrust mapping incorrect');
+    assert(abs(params.B(9,1) - 1/params.m) < TOL, 'Thrust mapping incorrect');
     
     % Verify hover thrust magnitude
     F_hover = params.u_hover(1);
     expected_hover = params.m * params.g;
-    assert(abs(F_hover - expected_hover) < Constants.TOL, ...
+    assert(abs(F_hover - expected_hover) < TOL, ...
            sprintf('Hover thrust should be %.4f N, got %.4f N', expected_hover, F_hover));
     
     fprintf('PASS\n');
