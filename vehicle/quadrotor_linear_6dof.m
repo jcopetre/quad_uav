@@ -154,6 +154,11 @@ function params = quadrotor_linear_6dof(Q, R, verbose)
     % Nominal hover control input
     params.u_hover = [params.m * params.g; 0; 0; 0];
     
+    %% Actuator Saturation Limits
+    % Hardware constraints independent of vehicle mass
+    params.u_max = [2 * params.m * params.g; 0.1; 0.1; 0.1];
+    params.u_min = [0; -0.1; -0.1; -0.1];
+
     %% Display summary
     if verbose
         fprintf('Quadrotor Linear 6DOF Model\n');

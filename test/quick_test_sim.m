@@ -145,8 +145,9 @@ legend('V_x', 'V_y', 'V_z', 'Location', 'best');
 
 sgtitle('Quadrotor LQR Control - Quick Test', 'FontSize', 16, 'FontWeight', 'bold');
 
-%% Summary
-metrics = compute_performance_metrics(t, x, trajectory, params);
+%% Step 7: Output Performance Metrics
+fprintf('Step 6: Generating plots...\n');
+metrics = compute_performance_metrics(t, x, trajectory, params, u_log);
 
 fprintf('\n========================================\n');
 fprintf('SIMULATION COMPLETE!\n');
