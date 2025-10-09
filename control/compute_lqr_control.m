@@ -36,8 +36,8 @@ function u = compute_lqr_control(x, x_ref, params)
 %
 % See also: quadrotor_linear_6dof, quadrotor_closed_loop_dynamics
 
-% Author: Trey Copeland
-% Date: 2025-01-08
+% Author: Trey Copeland, jcopetre@gmail.com
+% Date: 2025-10-09
 
 %% Validate inputs
 assert(length(x) == 12, 'State vector must be 12x1');

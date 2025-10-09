@@ -44,7 +44,7 @@ function waypoints = load_waypoints(filename)
 % See also: jsondecode, generate_trajectory
 
 % Author: Trey Copeland
-% Date: 2025-01-09
+% Date: 2025-10-09
 
 %% Validate input
 assert(ischar(filename) || isstring(filename), 'Filename must be a string');

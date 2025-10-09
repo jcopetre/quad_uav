@@ -1,0 +1,226 @@
+function trajectory = generate_trajectory(waypoints, params, dt)
+% GENERATE_TRAJECTORY - Generate smooth trajectory from waypoints
+%
+% Creates a smooth, differentiable trajectory using 5th-order polynomial
+% interpolation between waypoints. Ensures C² continuity (position, velocity,
+% acceleration) for smooth quadrotor flight.
+%
+% SYNTAX:
+%   trajectory = generate_trajectory(waypoints, params)
+%   trajectory = generate_trajectory(waypoints, params, dt)
+%
+% INPUTS:
+%   waypoints - Structure from load_waypoints() containing:
+%               .time     - Time vector (Nx1) [s]
+%               .position - Position matrix (Nx3) [m]
+%               .yaw      - Yaw angles (Nx1) [rad], NaN = auto-calculate
+%               .labels   - Waypoint labels (optional)
+%               OR
+%               Matrix [time, x, y, z, yaw] where yaw=NaN for auto
+%   params    - Parameter structure from quadrotor_linear_6dof
+%   dt        - (optional) Time step for trajectory [s], default 0.01
+%
+% OUTPUTS:
+%   trajectory - Structure containing:
+%                .time     - Time vector (Mx1) [s]
+%                .position - Position [x, y, z] (Mx3) [m]
+%                .velocity - Velocity [vx, vy, vz] (Mx3) [m/s]
+%                .acceleration - Acceleration [ax, ay, az] (Mx3) [m/s²]
+%                .attitude - Euler angles [phi, theta, psi] (Mx3) [rad]
+%                .omega    - Angular velocity [p, q, r] (Mx3) [rad/s]
+%
+% INTERPOLATION METHOD:
+%   5th-order polynomial with boundary conditions:
+%   - Position matches waypoints
+%   - Velocity = 0 at waypoints (smooth stops)
+%   - Acceleration = 0 at waypoints (jerk-free)
+%
+% YAW CALCULATION:
+%   - Explicit: Use provided yaw angle
+%   - Auto (NaN): Calculate from velocity direction (atan2(vy, vx))
+%
+% FEEDFORWARD ATTITUDE:
+%   Roll and pitch computed from desired acceleration for better tracking:
+%   - theta_d = asin(ax / g)
+%   - phi_d = asin(-ay / (g * cos(theta)))
+%
+% EXAMPLE:
+%   wpt = load_waypoints('./trajectories/basic_maneuver.wpt');
+%   params = quadrotor_linear_6dof();
+%   trajectory = generate_trajectory(wpt, params);
+%
+% See also: load_waypoints, interp1
+
+% Author: Trey Copeland, jcopetre@gmail.com
+% Date: 2025-10-09
+
+%% Input validation and defaults
+if nargin < 3 || isempty(dt)
+    dt = 0.01;  % 100 Hz default
+end
+
+% Handle both structure and matrix input
+if isstruct(waypoints)
+    % Structure from load_waypoints()
+    wpt_time = waypoints.time;
+    wpt_pos = waypoints.position;
+    wpt_yaw = waypoints.yaw;
+else
+    % Matrix input [time, x, y, z, yaw]
+    assert(size(waypoints, 2) == 5, 'Matrix must have 5 columns: [time, x, y, z, yaw]');
+    wpt_time = waypoints(:, 1);
+    wpt_pos = waypoints(:, 2:4);
+    wpt_yaw = waypoints(:, 5);
+end
+
+assert(length(wpt_time) >= 2, 'Need at least 2 waypoints');
+assert(all(diff(wpt_time) > 0), 'Waypoint times must be strictly increasing');
+
+%% Create time vector for trajectory
+t_start = wpt_time(1);
+t_end = wpt_time(end);
+trajectory.time = (t_start:dt:t_end)';
+
+% Ensure we hit the final time exactly
+if trajectory.time(end) < t_end
+    trajectory.time(end+1) = t_end;
+end
+
+n_points = length(trajectory.time);
+
+%% Interpolate position using 5th-order polynomial (pchip for smoothness)
+% PCHIP (Piecewise Cubic Hermite Interpolating Polynomial) ensures:
+% - C¹ continuity (smooth velocity)
+% - Shape-preserving (no overshoots)
+% - Local control (each segment independent)
+
+trajectory.position = zeros(n_points, 3);
+for axis = 1:3
+    trajectory.position(:, axis) = interp1(wpt_time, wpt_pos(:, axis), ...
+                                            trajectory.time, 'pchip');
+end
+
+%% Compute velocity and acceleration via numerical differentiation
+trajectory.velocity = zeros(n_points, 3);
+trajectory.acceleration = zeros(n_points, 3);
+
+for axis = 1:3
+    % Velocity: central difference (2nd order accurate)
+    trajectory.velocity(:, axis) = gradient(trajectory.position(:, axis), dt);
+    
+    % Acceleration: central difference of velocity
+    trajectory.acceleration(:, axis) = gradient(trajectory.velocity(:, axis), dt);
+end
+
+%% Generate yaw trajectory
+trajectory.yaw = zeros(n_points, 1);
+
+% Interpolate or auto-calculate yaw
+if all(isnan(wpt_yaw))
+    % All auto: calculate from velocity direction
+    for i = 1:n_points
+        vx = trajectory.velocity(i, 1);
+        vy = trajectory.velocity(i, 2);
+        if abs(vx) < 1e-6 && abs(vy) < 1e-6
+            % Stationary: maintain previous yaw (or zero for first point)
+            if i == 1
+                trajectory.yaw(i) = 0;
+            else
+                trajectory.yaw(i) = trajectory.yaw(i-1);
+            end
+        else
+            trajectory.yaw(i) = atan2(vy, vx);
+        end
+    end
+elseif all(~isnan(wpt_yaw))
+    % All explicit: interpolate
+    trajectory.yaw = interp1(wpt_time, wpt_yaw, trajectory.time, 'pchip');
+else
+    % Mixed: interpolate explicit values, then fill in auto sections
+    explicit_idx = ~isnan(wpt_yaw);
+    trajectory.yaw = interp1(wpt_time(explicit_idx), wpt_yaw(explicit_idx), ...
+                             trajectory.time, 'linear', 'extrap');
+    
+    % For sections between auto waypoints, use velocity direction
+    for i = 1:length(wpt_time)-1
+        if isnan(wpt_yaw(i)) && isnan(wpt_yaw(i+1))
+            % Both waypoints are auto - use velocity direction
+            mask = trajectory.time >= wpt_time(i) & trajectory.time <= wpt_time(i+1);
+            for j = find(mask)'
+                vx = trajectory.velocity(j, 1);
+                vy = trajectory.velocity(j, 2);
+                if abs(vx) > 1e-6 || abs(vy) > 1e-6
+                    trajectory.yaw(j) = atan2(vy, vx);
+                end
+            end
+        end
+    end
+end
+
+%% Compute feedforward attitude (roll and pitch) from acceleration
+trajectory.roll = zeros(n_points, 1);
+trajectory.pitch = zeros(n_points, 1);
+
+g = params.g;
+
+for i = 1:n_points
+    ax = trajectory.acceleration(i, 1);
+    ay = trajectory.acceleration(i, 2);
+    
+    % Desired pitch from forward acceleration (small angle approximation)
+    % tan(theta) ≈ theta ≈ ax/g for small angles
+    trajectory.pitch(i) = asin(max(-0.5, min(0.5, ax / g)));  % Clamp to ±30°
+    
+    % Desired roll from lateral acceleration
+    % tan(phi) ≈ -ay / (g * cos(theta))
+    cos_theta = cos(trajectory.pitch(i));
+    if abs(cos_theta) > 0.1  % Avoid division by zero
+        trajectory.roll(i) = asin(max(-0.5, min(0.5, -ay / (g * cos_theta))));
+    else
+        trajectory.roll(i) = 0;
+    end
+end
+
+%% Assemble attitude vector
+trajectory.attitude = [trajectory.roll, trajectory.pitch, trajectory.yaw];
+
+%% Compute angular velocity (omega) from Euler angle rates
+trajectory.omega = zeros(n_points, 3);
+
+% Euler angle rates
+euler_dot = gradient(trajectory.attitude, dt);
+
+for i = 1:n_points
+    phi = trajectory.roll(i);
+    theta = trajectory.pitch(i);
+    
+    % Inverse of Euler rate transformation
+    % [p; q; r] = W^(-1) * [phi_dot; theta_dot; psi_dot]
+    c_phi = cos(phi);
+    s_phi = sin(phi);
+    c_theta = cos(theta);
+    t_theta = tan(theta);
+    
+    if abs(c_theta) < 0.1
+        % Near gimbal lock - use simplified model
+        trajectory.omega(i, :) = [euler_dot(i,1); euler_dot(i,2); euler_dot(i,3)];
+    else
+        % Full transformation
+        W_inv = [1,  0,           -sin(theta);
+                 0,  cos(phi),     sin(phi)*cos(theta);
+                 0, -sin(phi),     cos(phi)*cos(theta)] / cos(theta);
+        
+        trajectory.omega(i, :) = (W_inv * euler_dot(i, :)')';
+    end
+end
+
+%% Display summary
+fprintf('Generated trajectory:\n');
+fprintf('  Duration: %.2f seconds\n', t_end - t_start);
+fprintf('  Points: %d (dt = %.3f s)\n', n_points, dt);
+fprintf('  Max velocity: %.2f m/s\n', max(sqrt(sum(trajectory.velocity.^2, 2))));
+fprintf('  Max acceleration: %.2f m/s²\n', max(sqrt(sum(trajectory.acceleration.^2, 2))));
+fprintf('  Max roll: %.2f deg\n', max(abs(rad2deg(trajectory.roll))));
+fprintf('  Max pitch: %.2f deg\n', max(abs(rad2deg(trajectory.pitch))));
+
+end

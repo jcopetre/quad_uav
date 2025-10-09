@@ -47,8 +47,8 @@ function x_dot = quadrotor_dynamics_pure(x, u, params)
 %
 % See also: quadrotor_linear_6dof, quadrotor_closed_loop_dynamics
 
-% Author: Trey Copeland
-% Date: 2025-01-08
+% Author: Trey Copeland, jcopetre@gmail.com
+% Date: 2025-10-09
 
 %% Extract states
 % Position (inertial frame)

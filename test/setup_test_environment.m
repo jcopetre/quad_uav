@@ -22,8 +22,8 @@ function root_dir = setup_test_environment()
 %
 % See also: addpath, rmpath
 
-% Author: Trey Copeland
-% Date: 2025-01-08
+% Author: Trey Copeland, jcopetre@gmail.com
+% Date: 2025-10-09
 
 %% Determine project structure
 test_dir = fileparts(mfilename('fullpath'));

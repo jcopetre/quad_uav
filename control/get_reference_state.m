@@ -34,8 +34,8 @@ function x_ref = get_reference_state(t, trajectory)
 %
 % See also: interp1, generate_trajectory
 
-% Author: Trey Copeland
-% Date: 2025-01-08
+% Author: Trey Copeland, jcopetre@gmail.com
+% Date: 2025-10-09
 
 %% Validate inputs
 assert(isscalar(t), 'Time must be a scalar');
