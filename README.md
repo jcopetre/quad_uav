@@ -2,19 +2,6 @@
 
 A complete simulation framework for trajectory tracking control of a 6 degree-of-freedom quadrotor UAV using Linear Quadratic Regulator (LQR) control.
 
-**Master's Project - Research Lab**
-
----
-
-## 📋 Project Objectives
-
-1. ✅ **Basic Framework**: Reference trajectory tracking with LQR control
-2. ✅ **Simulation**: 6DOF linearized quadrotor model with nonlinear dynamics
-3. ✅ **Trajectory Generation**: Control-optimal trajectories (minimum-snap)
-4. ✅ **Performance Evaluation**: Quantitative metrics and visualization
-5. 🔄 **Monte Carlo Analysis**: Robustness and sensitivity analysis (future)
-6. 🔄 **Hardware Deployment**: Embedded system implementation (optional)
-
 ---
 
 ## 📁 Project Structure
@@ -23,14 +10,16 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
 <root>/
 │
 ├── README.md                            [This file]
+├── Constants.m                          [Shared constants for tests]
 ├── simulate_quadrotor_pure.m            [Main simulation script - RUN THIS]
+├── quick_test_simulation.m              [Quick test script]
 │
 ├── vehicle/
 │   └── quadrotor_linear_6dof.m          [Vehicle model, parameters, LQR design]
 │
 ├── trajectories/
-│   ├── load_waypoints.m                 [Waypoint file loader]
-│   ├── generate_trajectory.m            [Minimum-snap trajectory generation]
+│   ├── load_waypoints.m                 [Waypoint file loader (JSON)]
+│   ├── generate_trajectory.m            [Smooth trajectory generation]
 │   └── *.wpt                            [Waypoint definition files (JSON)]
 │
 ├── control/
@@ -40,6 +29,14 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
 │
 ├── dynamics/
 │   └── quadrotor_dynamics_pure.m        [Nonlinear 6DOF dynamics]
+│
+├── test/
+│   ├── setup_test_environment.m         [Test environment setup]
+│   ├── test_linear_6dof.m               [Vehicle model tests]
+│   ├── test_dynamics_pure.m             [Dynamics tests]
+│   ├── test_control_loop.m              [Control loop tests]
+│   ├── test_waypoints.m                 [Waypoint loader tests]
+│   └── test_trajectory.m                [Trajectory generation tests]
 │
 └── results/
     └── simulation_results.mat           [Saved simulation outputs]
@@ -131,7 +128,7 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
 1. INITIALIZATION
    └─> quadrotor_linear_6dof()
        ├─> Define: m, g, L, Ixx, Iyy, Izz
-       ├─> Build: A, B matrices (linearized)
+       ├─> Build: A, B matrices (linearized, NED coordinates)
        ├─> Design: LQR gains K from (A,B,Q,R)
        └─> Return: params struct
 
@@ -146,7 +143,7 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
    └─> generate_trajectory(wpt, params)
        ├─> Accept JSON structure OR matrix input
        ├─> Process yaw: explicit values or auto from velocity
-       ├─> 5th-order polynomial interpolation
+       ├─> Shape-preserving cubic interpolation (pchip)
        ├─> Compute: pos, vel, acc, yaw
        ├─> Feedforward: phi_d, theta_d from acc
        └─> Return: trajectory struct
@@ -196,6 +193,17 @@ Where:
   Torques: τ_φ, τ_θ, τ_ψ    [N·m]
 ```
 
+## 🧭 Coordinate Frame Convention
+
+**NED (North-East-Down):**
+- **+X**: North (forward)
+- **+Y**: East (right)
+- **+Z**: Down (toward ground)
+- **Gravity**: Acts in +Z direction (downward)
+- **Thrust**: Acts in -Z direction (upward, opposes +Z)
+
+This is the standard aerospace convention used throughout the simulation.
+
 ---
 
 ## 🚀 Quick Start
@@ -205,6 +213,8 @@ Where:
 mkdir('./trajectories');
 mkdir('./control');
 mkdir('./dynamics');
+mkdir('./vehicle');
+mkdir('./test');
 mkdir('./results');
 ```
 
@@ -212,8 +222,14 @@ mkdir('./results');
 - Copy each `.m` file to its designated folder (see structure above)
 - Ensure `quadrotor_linear_6dof.m` is in `./vehicle/`
 - Place waypoint `.wpt` files in `./trajectories/`
+- Place test files in `./test/`
 
-### 3. Run Simulation
+### 3. Run Quick Test
+```matlab
+quick_test_simulation
+```
+
+### 4. Run Full Simulation
 ```matlab
 simulate_quadrotor_pure
 ```
@@ -241,6 +257,30 @@ Control Effort:    145.67
 
 ---
 
+## 🧪 Testing
+
+### Run All Tests
+```matlab
+% Run individual test suites
+test_linear_6dof        % Vehicle model (7 tests)
+test_dynamics_pure      % Nonlinear dynamics (7 tests)
+test_control_loop       % Control loop (8 tests)
+test_waypoints          # Waypoint loader (7 tests)
+test_trajectory         # Trajectory generation (8 tests)
+```
+
+### Test Coverage
+- **37 unit tests** covering all core functionality
+- Tests validate:
+  - Physical parameter correctness
+  - LQR stability and controllability
+  - Nonlinear dynamics accuracy
+  - Control law implementation
+  - Trajectory generation smoothness
+  - Waypoint file parsing
+
+---
+
 ## 🔧 Customization
 
 ### Define Trajectories
@@ -254,7 +294,7 @@ Create a `.wpt` file (JSON format) in `./trajectories/`:
   "metadata": {
     "name": "Basic Test Flight",
     "description": "Takeoff, maneuver, and land",
-    "created": "2025-01-08",
+    "created": "2025-01-09",
     "vehicle": "quadrotor_500g"
   },
   "waypoints": [
@@ -285,7 +325,7 @@ trajectory = generate_trajectory(wpt, params);
 - **waypoints** (required): Array of waypoint objects
   - **label**: Waypoint identifier used in outputs and plot annotations
   - **time**: Time to reach waypoint in seconds
-  - **x, y, z**: Position in meters
+  - **x, y, z**: Position in meters (NED coordinates)
   - **yaw**: Heading angle in radians, or `null` for auto-calculation
 
 **Yaw Behavior:**
@@ -407,6 +447,7 @@ params.Ixx = 0.01;   % Inertia (kg·m²)
 - Position tracking (X, Y, Z)
 - Attitude tracking (roll, pitch, yaw)
 - Control inputs (thrust and torques)
+- Velocity profiles
 
 ### Saved Data
 - `./results/simulation_results.mat` contains:
@@ -421,23 +462,76 @@ params.Ixx = 0.01;   % Inertia (kg·m²)
 ## 🎓 Theory
 
 ### LQR Controller
-Minimizes cost function:
+
+**Linear Quadratic Regulator (LQR)** is an optimal control technique that finds the feedback gain matrix K by minimizing a quadratic cost function:
+
 ```
-J = ∫(xᵀQx + uᵀRu)dt
+J = ∫ (xᵀQx + uᵀRu) dt
 ```
 
-Optimal control law:
-```
-u = u_hover - K(x - x_ref)
-```
+**Cost Function**
 
-Where K is computed from the linearized system using MATLAB's `lqr()` function.
+The cost function balances two competing objectives:
+- **xᵀQx**: Penalizes deviations from the reference state (tracking error)
+  - Larger Q weights → tighter tracking, more aggressive response
+  - The Q matrix lets us prioritize certain states (e.g., position over velocity)
+- **uᵀRu**: Penalizes control effort (energy/actuator usage)
+  - Larger R weights → smoother control, less aggressive
+  - Prevents excessive actuator commands and conserves energy
+
+**How LQR Derives K:**
+
+1. **Algebraic Riccati Equation (ARE)**: MATLAB's `lqr()` solves the continuous-time ARE:
+   ```
+   AᵀS + SA - SBR⁻¹BᵀS + Q = 0
+   ```
+   for the matrix S (solution to the Riccati equation).
+
+2. **Optimal Gain**: Once S is found, the optimal feedback gain is:
+   ```
+   K = R⁻¹BᵀS
+   ```
+
+3. **Control Law**: The resulting control minimizes the cost function:
+   ```
+   u = u_hover - K(x - x_ref)
+   ```
+   - **u_hover**: Nominal control to maintain equilibrium (hover thrust)
+   - **-K(x - x_ref)**: Feedback correction proportional to tracking error
+   - The negative sign ensures feedback **opposes** the error
+
+**Key Properties:**
+- **Guaranteed stability**: Closed-loop system (A - BK) has all poles in left half-plane
+- **Optimal for linear systems**: Provably minimizes the cost function
+- **Trade-off tuning**: Q and R matrices provide intuitive tuning knobs
+- **Robust margins**: Provides guaranteed gain/phase margins (60°/6dB)
+
+**Why It Works for Quadrotors:**
+
+Even though the quadrotor has **nonlinear dynamics**, LQR works well because:
+1. The system is linearized around hover (where we spend most time)
+2. For small deviations, the linear approximation is accurate
+3. The LQR gain provides inherent robustness to modeling errors
+4. Quadrotor dynamics are "mildly nonlinear" near hover
+
+**Limitations:**
+- Performance degrades far from the linearization point
+- No guarantees for large angle maneuvers or aggressive flight
+- Extensions like gain scheduling or nonlinear control improve performance
 
 ### Trajectory Generation
-5th-order polynomial ensures:
-- C² continuity (smooth position, velocity, acceleration)
-- Zero velocity/acceleration at waypoints
-- Minimum snap for quadrotor dynamics
+Shape-preserving cubic interpolation (pchip) ensures:
+- C¹ continuity (smooth position and velocity)
+- Shape preservation (no overshoots between waypoints)
+- Local control (changes affect only nearby segments)
+- Numerically stable differentiation for acceleration
+
+### Coordinate Frames
+**Body Frame to Inertial (NED):**
+```
+R_b2i = Rz(ψ) * Ry(θ) * Rx(φ)
+```
+Standard ZYX Euler angle sequence (yaw-pitch-roll).
 
 ---
 
@@ -451,7 +545,7 @@ Where K is computed from the linearized system using MATLAB's `lqr()` function.
 
 ### Extensions
 - Multiple controller comparison (PID, MPC, etc.)
-- Optimal trajectory generation (min control effort)
+- True minimum-snap trajectory optimization
 - Observer/estimator design
 - Hardware deployment to embedded system
 
@@ -462,25 +556,18 @@ Where K is computed from the linearized system using MATLAB's `lqr()` function.
 | File | Purpose |
 |------|---------|
 | `simulate_quadrotor_pure.m` | Main orchestrator, runs simulation |
+| `quick_test_simulation.m` | Quick test script with visualization |
 | `quadrotor_linear_6dof.m` | Vehicle model and LQR design |
 | `load_waypoints.m` | Waypoint file loader (JSON .wpt format) |
-| `generate_trajectory.m` | Minimum-snap trajectory generation (accepts JSON or matrix) |
-| `compute_lqr_control.m` | LQR control law |
-| `get_reference_state.m` | Reference state lookup |
+| `generate_trajectory.m` | Smooth trajectory generation (pchip interpolation) |
+| `compute_lqr_control.m` | LQR control law with saturation |
+| `get_reference_state.m` | Reference state lookup with interpolation |
 | `quadrotor_closed_loop_dynamics.m` | ODE wrapper function |
-| `quadrotor_dynamics_pure.m` | Nonlinear 6DOF dynamics |
-| `*.wpt` (trajectories) | Waypoint definitions (JSON format) |
-
----
-
-## ✅ Design Principles
-
-1. **Modularity**: Each component in separate file
-2. **Single Responsibility**: Each function does one thing well
-3. **Readability**: Clear variable names, comprehensive comments
-4. **Testability**: Easy to test components independently
-5. **Extensibility**: Simple to add new features
-6. **MATLAB Best Practices**: Vectorized operations, efficient ODE integration
+| `quadrotor_dynamics_pure.m` | Nonlinear 6DOF dynamics (NED coordinates) |
+| `Constants.m` | Shared constants classdef |
+| `setup_test_environment.m` | Test path configuration |
+| `test_*.m` | Unit test suites. These can aid in understanding how various functions work and facilitate identifying breaking changes |
+| `*.wpt` (waypoints) | Waypoint definitions (JSON format) |
 
 ---
 
@@ -498,5 +585,6 @@ Where K is computed from the linearized system using MATLAB's `lqr()` function.
 - **LQR Theory**: Anderson, B. D., & Moore, J. B. (1990). *Optimal Control: Linear Quadratic Methods*
 - **Quadrotor Dynamics**: Bouabdallah, S. (2007). *Design and Control of Quadrotors with Application to Autonomous Flying*
 - **Trajectory Optimization**: Mellinger, D., & Kumar, V. (2011). *Minimum Snap Trajectory Generation and Control for Quadrotors*
+- **NED Coordinates**: Standard aerospace convention (ISO 8855, SAE J670)
 
 ---
