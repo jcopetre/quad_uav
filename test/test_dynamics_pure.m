@@ -20,7 +20,7 @@ function test_dynamics_pure()
     test_symmetry();
     
     fprintf('\n============================================\n');
-    fprintf('All Tests Passed! ✓\n\n');
+    fprintf('All Tests Passed! \n\n');
 end
 
 %% Test 1: Hover Equilibrium
@@ -39,10 +39,10 @@ function test_hover_equilibrium()
     x_dot = quadrotor_dynamics_pure(x_hover, u_hover, params);
     
     % At hover, all derivatives should be zero (or very close)
-    % Position rates = velocities = 0 ✓
-    % Euler rates = W*omega = W*0 = 0 ✓
-    % Accelerations = (thrust - weight)/m = 0 ✓
-    % Angular accelerations = I\(tau - omega×Iomega) = I\0 = 0 ✓
+    % Position rates = velocities = 0
+    % Euler rates = W*omega = W*0 = 0
+    % Accelerations = (thrust - weight)/m = 0
+    % Angular accelerations = I\(tau - omega×Iomega) = I\0 = 0
     
     max_derivative = max(abs(x_dot));
     assert(max_derivative < Constants.TOL, ...

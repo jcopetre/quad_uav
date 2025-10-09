@@ -111,8 +111,8 @@ A(8, 4) = params.g;    % ÿ coupled to roll (φ)
 % Initialize input matrix (12x4)
 B = zeros(12, 4);
 
-% Thrust affects vertical acceleration
-B(9, 1) = 1 / params.m;   % z̈ = F/m
+% Thrust affects vertical acceleration (NED: +z is down, thrust opposes this)
+B(9, 1) = -1 / params.m;   % Negative because thrust acts upward (-z direction)
 
 % Torques affect angular accelerations
 B(10, 2) = 1 / params.Ixx;   % ṗ = τ_φ/Ixx
