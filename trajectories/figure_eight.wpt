@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "name": "Figure Eight Pattern",
+    "description": "Classic figure-eight trajectory for testing smooth tracking and coordination",
+    "created": "2025-10-09",
+    "vehicle": "quadrotor_500g",
+    "notes": "Parametric figure-eight in horizontal plane with constant altitude"
+  },
+  "waypoints": [
+    {"label": "start", "time": 0, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": 0.0},
+    {"label": "right_lobe_top", "time": 2, "x": 1.5, "y": 0.866, "z": 1.5, "yaw": null},
+    {"label": "right_peak", "time": 4, "x": 2.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "right_lobe_bottom", "time": 6, "x": 1.5, "y": -0.866, "z": 1.5, "yaw": null},
+    {"label": "center_cross", "time": 8, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "left_lobe_bottom", "time": 10, "x": -1.5, "y": -0.866, "z": 1.5, "yaw": null},
+    {"label": "left_peak", "time": 12, "x": -2.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "left_lobe_top", "time": 14, "x": -1.5, "y": 0.866, "z": 1.5, "yaw": null},
+    {"label": "return", "time": 16, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": 0.0}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "metadata": {
+    "name": "Aggressive Racing Track",
+    "description": "High-speed racing with tight corners"
+  },
+  "waypoints": [
+    {"label": "start", "time": 0, "x": 0, "y": 0, "z": 1, "yaw": 0},
+    {"label": "gate1", "time": 1, "x": 5, "y": 0, "z": 2, "yaw": null},
+    {"label": "turn1", "time": 2, "x": 8, "y": 3, "z": 2, "yaw": null},
+    {"label": "dive", "time": 3, "x": 8, "y": 6, "z": 0.5, "yaw": null},
+    {"label": "finish", "time": 4, "x": 0, "y": 6, "z": 1, "yaw": 3.14}
+  ]
+}

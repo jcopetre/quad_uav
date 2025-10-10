@@ -1,4 +1,4 @@
-function trajectory = generate_trajectory(waypoints, params, dt)
+function trajectory = generate_trajectory_interp(waypoints, params, dt)
 % GENERATE_TRAJECTORY - Generate smooth trajectory from waypoints
 %
 % Creates a smooth, differentiable trajectory using 5th-order polynomial

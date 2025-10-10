@@ -1,0 +1,14 @@
+{
+  "metadata": {
+    "name": "Building Inspection",
+    "description": "Slow, precise inspection flight"
+  },
+  "waypoints": [
+    {"label": "takeoff", "time": 0, "x": 0, "y": 0, "z": 0, "yaw": 0},
+    {"label": "climb", "time": 3, "x": 0, "y": 0, "z": 3, "yaw": 0},
+    {"label": "face_wall", "time": 6, "x": 2, "y": 0, "z": 3, "yaw": 0},
+    {"label": "move_right", "time": 12, "x": 2, "y": 5, "z": 3, "yaw": 0},
+    {"label": "descend", "time": 15, "x": 2, "y": 5, "z": 1, "yaw": 0},
+    {"label": "land", "time": 18, "x": 0, "y": 0, "z": 0, "yaw": 0}
+  ]
+}
