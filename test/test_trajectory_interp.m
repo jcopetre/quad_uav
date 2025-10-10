@@ -1,10 +1,10 @@
 % test_trajectory.m
-% Unit tests for generate_trajectory function
+% Unit tests for generate_trajectory_interp function
 %
 % Tests trajectory generation from waypoints
 
 function test_trajectory()
-    fprintf('Running Unit Tests: generate_trajectory\n');
+    fprintf('Running Unit Tests: generate_trajectory_interp\n');
     fprintf('========================================\n\n');
     
     % Setup test environment
@@ -36,7 +36,7 @@ function test_simple_trajectory()
     wpt.yaw = [0; NaN; 0];
     
     % Generate trajectory
-    trajectory = generate_trajectory(wpt, params);
+    trajectory = generate_trajectory_interp(wpt, params);
     
     % Check structure exists
     assert(isstruct(trajectory), 'Should return structure');
@@ -61,7 +61,7 @@ function test_trajectory_structure()
     wpt.position = [0 0 0; 1 0 0];
     wpt.yaw = [0; 0];
     
-    trajectory = generate_trajectory(wpt, params, 0.1);
+    trajectory = generate_trajectory_interp(wpt, params, 0.1);
     
     n = length(trajectory.time);
     
@@ -91,7 +91,7 @@ function test_waypoint_satisfaction()
     wpt.position = [0 0 0; 1 1 1; 2 0 1];
     wpt.yaw = [0; pi/4; pi/2];
     
-    trajectory = generate_trajectory(wpt, params, 0.01);
+    trajectory = generate_trajectory_interp(wpt, params, 0.01);
     
     % Check that trajectory passes through waypoints
     for i = 1:length(wpt.time)
@@ -124,7 +124,7 @@ function test_continuity()
     wpt.position = [0 0 0; 1 0 1; 2 1 1];
     wpt.yaw = [0; 0; 0];
     
-    trajectory = generate_trajectory(wpt, params, 0.01);
+    trajectory = generate_trajectory_interp(wpt, params, 0.01);
     
     % Check velocity is continuous (no jumps)
     vel_diff = diff(trajectory.velocity);
@@ -153,7 +153,7 @@ function test_yaw_auto_calculation()
     wpt.position = [0 0 0; 2 0 0];
     wpt.yaw = [NaN; NaN];  % Auto-calculate both
     
-    trajectory = generate_trajectory(wpt, params, 0.1);
+    trajectory = generate_trajectory_interp(wpt, params, 0.1);
     
     % Find section where moving
     moving = sqrt(sum(trajectory.velocity.^2, 2)) > 0.1;
@@ -179,7 +179,7 @@ function test_yaw_explicit()
     wpt.position = [0 0 0; 1 1 0];
     wpt.yaw = [0; 0];  % Keep yaw at 0
     
-    trajectory = generate_trajectory(wpt, params, 0.1);
+    trajectory = generate_trajectory_interp(wpt, params, 0.1);
     
     % Yaw should remain near 0 throughout
     max_yaw = max(abs(trajectory.attitude(:, 3)));
@@ -202,7 +202,7 @@ function test_matrix_input()
         4,  2,  0,  1,  0
     ];
     
-    trajectory = generate_trajectory(waypoints, params, 0.1);
+    trajectory = generate_trajectory_interp(waypoints, params, 0.1);
     
     % Should work identically to structure input
     assert(isstruct(trajectory), 'Should return structure');
@@ -229,7 +229,7 @@ function test_time_sampling()
     dt_values = [0.01, 0.05, 0.1];
     
     for dt = dt_values
-        trajectory = generate_trajectory(wpt, params, dt);
+        trajectory = generate_trajectory_interp(wpt, params, dt);
         
         % Check time step is approximately dt
         actual_dt = mean(diff(trajectory.time));

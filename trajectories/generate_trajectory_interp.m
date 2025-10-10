@@ -1,9 +1,12 @@
 function trajectory = generate_trajectory_interp(waypoints, params, dt)
-% GENERATE_TRAJECTORY - Generate smooth trajectory from waypoints
+% GENERATE_TRAJECTORY_INTERP - Generate smooth trajectory from waypoints
 %
-% Creates a smooth, differentiable trajectory using 5th-order polynomial
-% interpolation between waypoints. Ensures C² continuity (position, velocity,
-% acceleration) for smooth quadrotor flight.
+% Creates smooth, differentiable trajectories using MAKIMA (Modified Akima 
+% piecewise cubic Hermite interpolation). Provides C¹ continuity with natural
+% motion characteristics suitable for most quadrotor applications.
+%
+% For optimal trajectories minimizing snap (4th derivative), use
+% generate_trajectory_minsnap() instead.
 %
 % SYNTAX:
 %   trajectory = generate_trajectory(waypoints, params)
@@ -30,10 +33,11 @@ function trajectory = generate_trajectory_interp(waypoints, params, dt)
 %                .omega    - Angular velocity [p, q, r] (Mx3) [rad/s]
 %
 % INTERPOLATION METHOD:
-%   5th-order polynomial with boundary conditions:
-%   - Position matches waypoints
-%   - Velocity = 0 at waypoints (smooth stops)
-%   - Acceleration = 0 at waypoints (jerk-free)
+%   Modified Akima (MAKIMA) interpolation with characteristics:
+%   - C¹ continuity (smooth position and velocity)
+%   - Non-zero velocities at waypoints (natural motion)
+%   - Reduced oscillations compared to spline methods
+%   - Robust to unequally-spaced waypoints
 %
 % YAW CALCULATION:
 %   - Explicit: Use provided yaw angle
