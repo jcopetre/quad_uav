@@ -22,6 +22,8 @@ function results = simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
 %                     .save_results - Save to ./results/ (default: true)
 %                     .plot         - Generate plots (default: true if no output)
 %                     .dt           - Trajectory time step (default: 0.01)
+%                     .params       - Pre-designed params (overrides Q, R)
+%                                     Use for Monte Carlo with fixed controller
 %
 % OUTPUTS:
 %   results - (optional) Structure containing simulation data:
@@ -97,23 +99,33 @@ if verbose
     fprintf('Step 1/6: Loading quadrotor model and designing controller...\n');
 end
 
-% Handle default Q and R matrices
-if nargin < 2 || isempty(Q)
-    Q = [];  % Use defaults in quadrotor_linear_6dof
-end
-
-if nargin < 3 || isempty(R)
-    R = [];  % Use defaults in quadrotor_linear_6dof
-end
-
-% Design LQR controller with provided or default weights
-params = quadrotor_linear_6dof(Q, R, verbose);
-
-if verbose
-    fprintf('  Vehicle: 500g quadrotor\n');
-    fprintf('  Controller: LQR with optimal gains\n');
-    fprintf('  Closed-loop poles: %.2f to %.2f (all stable)\n', ...
-            min(real(params.poles)), max(real(params.poles)));
+% Check if params provided via options (for Monte Carlo with fixed controller)
+if isfield(options, 'params') && ~isempty(options.params)
+    % Use pre-designed params (e.g., fixed K with varied mass)
+    params = options.params;
+    if verbose
+        fprintf('  Using provided params (mass=%.3f kg, K fixed)\n', params.m);
+        fprintf('  Controller: Pre-designed (from options)\n');
+    end
+else
+    % Design new controller from Q, R
+    if nargin < 2 || isempty(Q)
+        Q = [];  % Use defaults in quadrotor_linear_6dof
+    end
+    
+    if nargin < 3 || isempty(R)
+        R = [];  % Use defaults in quadrotor_linear_6dof
+    end
+    
+    % Design LQR controller with provided or default weights
+    params = quadrotor_linear_6dof(Q, R, verbose);
+    
+    if verbose
+        fprintf('  Vehicle: 500g quadrotor\n');
+        fprintf('  Controller: LQR with optimal gains\n');
+        fprintf('  Closed-loop poles: %.2f to %.2f (all stable)\n', ...
+                min(real(params.poles)), max(real(params.poles)));
+    end
 end
 
 %% ========================================================================
@@ -143,35 +155,22 @@ end
 
 % Generate smooth trajectory
 if verbose
-    fprintf('\nStep 3/6: Generating smooth trajectory...\n');
+    fprintf('\nStep 3/6: Preparing trajectory from waypoints...\n');
 end
 
-trajectory = generate_trajectory(wpt, params, options.dt);
+% Use waypoints directly as sparse trajectory
+% get_reference_state() will interpolate on-the-fly during simulation
+trajectory.time = wpt.time;
+trajectory.position = wpt.position;
+trajectory.velocity = zeros(length(wpt.time), 3);  % Zero velocity at waypoints
+trajectory.attitude = zeros(length(wpt.time), 3);  % Level flight
+trajectory.omega = zeros(length(wpt.time), 3);     % No angular velocity
 
-% % TEMPORARY DEBUG: Use exact trajectory from quick_test_sim
-% if verbose
-%     fprintf('\nStep 3/6: Using DEBUG hardcoded trajectory...\n');
-% end
-% 
-% trajectory.time = [0; 3; 7; 11; 15]';
-% trajectory.position = [
-%     0,  0,  0;      
-%     0,  0,  1;      
-%     2,  0,  1;      
-%     2,  2,  1;      
-%     2,  2,  0.5     
-% ];
-% trajectory.velocity = [
-%     0,  0,  0;
-%     0,  0,  0.33;   
-%     0.5, 0,  0;     
-%     0,  0.5, 0;     
-%     0,  0, -0.125   
-% ];
-% trajectory.attitude = zeros(5, 3);
-% trajectory.omega = zeros(5, 3);
-% 
-% fprintf('  WARNING: Using hardcoded trajectory for debugging!\n');
+if verbose
+    fprintf('  Trajectory: %d waypoints\n', length(wpt.time));
+    fprintf('  Duration: %.1f seconds\n', wpt.time(end) - wpt.time(1));
+    fprintf('  Note: Using sparse waypoints; interpolation done on-the-fly\n');
+end
 
 %% ========================================================================
 %  STEP 5: SETUP INITIAL CONDITIONS
@@ -384,6 +383,8 @@ end
 %  STEP 9: SAVE RESULTS
 %  ========================================================================
 
+timestamp = datestr(now, 'yyyy-mm-dd_HH-MM-SS');
+
 if options.save_results
     if verbose
         fprintf('\nSaving results...\n');
@@ -395,8 +396,7 @@ if options.save_results
         mkdir(results_dir);
     end
     
-    % Generate filename with timestamp
-    timestamp = datestr(now, 'yyyy-mm-dd_HH-MM-SS');
+    % Generate filename with timestamp  
     [~, traj_name, ~] = fileparts(trajectory_file);
     filename = sprintf('simulation_%s_%s.mat', traj_name, timestamp);
     filepath = fullfile(results_dir, filename);

@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "Simple Test (Matches quick_test_sim)",
+    "description": "Known working trajectory",
+    "created": "2025-10-09",
+    "vehicle": "quadrotor_500g"
+  },
+  "waypoints": [
+    {"label": "start", "time": 0, "x": 0, "y": 0, "z": 0, "yaw": null},
+    {"label": "climb", "time": 3, "x": 0, "y": 0, "z": 1, "yaw": null},
+    {"label": "forward", "time": 7, "x": 2, "y": 0, "z": 1, "yaw": null},
+    {"label": "right", "time": 11, "x": 2, "y": 2, "z": 1, "yaw": null},
+    {"label": "descend", "time": 15, "x": 2, "y": 2, "z": 0.5, "yaw": null}
+  ]
+}

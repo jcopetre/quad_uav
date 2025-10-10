@@ -88,16 +88,21 @@ end
 
 n_points = length(trajectory.time);
 
-%% Interpolate position using 5th-order polynomial (pchip for smoothness)
-% PCHIP (Piecewise Cubic Hermite Interpolating Polynomial) ensures:
+%% Interpolate position using Modified Akima interpolation
+% MAKIMA (Modified Akima piecewise cubic Hermite interpolation) ensures:
 % - C¹ continuity (smooth velocity)
-% - Shape-preserving (no overshoots)
-% - Local control (each segment independent)
+% - Non-zero velocities at waypoints (natural motion, no stopping)
+% - Reduces oscillations near abrupt changes
+% - More robust than spline for unequally-spaced waypoints
+%
+% Note: PCHIP was originally used but creates zero velocity at waypoints,
+% causing the quadrotor to stop at each waypoint and then accelerate hard,
+% leading to control saturation and tracking failures.
 
 trajectory.position = zeros(n_points, 3);
 for axis = 1:3
     trajectory.position(:, axis) = interp1(wpt_time, wpt_pos(:, axis), ...
-                                            trajectory.time, 'pchip');
+                                            trajectory.time, 'makima');
 end
 
 %% Compute velocity and acceleration via numerical differentiation
@@ -133,7 +138,11 @@ if all(isnan(wpt_yaw))
         end
     end
 elseif all(~isnan(wpt_yaw))
-    % All explicit: interpolate
+    % All explicit: interpolate yaw angles
+    % Use PCHIP for yaw (unlike position) because:
+    % - Shape-preserving prevents overshoot in heading
+    % - Yaw can naturally hold constant between maneuvers
+    % - Reduces oscillation near large heading changes
     trajectory.yaw = interp1(wpt_time, wpt_yaw, trajectory.time, 'pchip');
 else
     % Mixed: interpolate explicit values, then fill in auto sections
@@ -165,34 +174,10 @@ trajectory.pitch = zeros(n_points, 1);
 trajectory.attitude = [trajectory.roll, trajectory.pitch, trajectory.yaw];
 
 %% Compute angular velocity (omega) from Euler angle rates
+% Since feedforward attitude is disabled (roll=0, pitch=0),
+% set omega to zero. The controller will generate required angular
+% velocities dynamically during flight.
 trajectory.omega = zeros(n_points, 3);
-
-% Euler angle rates
-euler_dot = gradient(trajectory.attitude, dt);
-
-for i = 1:n_points
-    phi = trajectory.roll(i);
-    theta = trajectory.pitch(i);
-    
-    % Inverse of Euler rate transformation
-    % [p; q; r] = W^(-1) * [phi_dot; theta_dot; psi_dot]
-    c_phi = cos(phi);
-    s_phi = sin(phi);
-    c_theta = cos(theta);
-    t_theta = tan(theta);
-    
-    if abs(c_theta) < 0.1
-        % Near gimbal lock - use simplified model
-        trajectory.omega(i, :) = [euler_dot(i,1); euler_dot(i,2); euler_dot(i,3)];
-    else
-        % Full transformation
-        W_inv = [1,  0,           -sin(theta);
-                 0,  cos(phi),     sin(phi)*cos(theta);
-                 0, -sin(phi),     cos(phi)*cos(theta)] / cos(theta);
-        
-        trajectory.omega(i, :) = (W_inv * euler_dot(i, :)')';
-    end
-end
 
 %% Display summary
 fprintf('Generated trajectory:\n');
