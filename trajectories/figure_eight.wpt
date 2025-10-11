@@ -1,20 +1,22 @@
 {
   "metadata": {
     "name": "Figure Eight Pattern",
-    "description": "Classic figure-eight trajectory for testing smooth tracking and coordination",
-    "created": "2025-10-09",
+    "description": "Figure-eight with proper lead-in from rest",
+    "created": "2025-10-10",
     "vehicle": "quadrotor_500g",
-    "notes": "Parametric figure-eight in horizontal plane with constant altitude"
+    "notes": "Added acceleration phase to start from zero velocity"
   },
   "waypoints": [
-    {"label": "start", "time": 0, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": 0.0},
-    {"label": "right_lobe_top", "time": 2, "x": 1.5, "y": 0.866, "z": 1.5, "yaw": null},
-    {"label": "right_peak", "time": 4, "x": 2.0, "y": 0.0, "z": 1.5, "yaw": null},
-    {"label": "right_lobe_bottom", "time": 6, "x": 1.5, "y": -0.866, "z": 1.5, "yaw": null},
-    {"label": "center_cross", "time": 8, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": null},
-    {"label": "left_lobe_bottom", "time": 10, "x": -1.5, "y": -0.866, "z": 1.5, "yaw": null},
-    {"label": "left_peak", "time": 12, "x": -2.0, "y": 0.0, "z": 1.5, "yaw": null},
-    {"label": "left_lobe_top", "time": 14, "x": -1.5, "y": 0.866, "z": 1.5, "yaw": null},
-    {"label": "return", "time": 16, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": 0.0}
+    {"label": "start_rest", "time": 0, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": 0.0},
+    {"label": "accelerate", "time": 2, "x": 0.5, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "right_lobe_top", "time": 4, "x": 1.5, "y": 0.866, "z": 1.5, "yaw": null},
+    {"label": "right_peak", "time": 6, "x": 2.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "right_lobe_bottom", "time": 8, "x": 1.5, "y": -0.866, "z": 1.5, "yaw": null},
+    {"label": "center_cross", "time": 10, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "left_lobe_bottom", "time": 12, "x": -1.5, "y": -0.866, "z": 1.5, "yaw": null},
+    {"label": "left_peak", "time": 14, "x": -2.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "left_lobe_top", "time": 16, "x": -1.5, "y": 0.866, "z": 1.5, "yaw": null},
+    {"label": "decelerate", "time": 18, "x": -0.5, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "end_rest", "time": 20, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": 0.0}
   ]
 }

@@ -47,7 +47,7 @@ function x_dot = quadrotor_closed_loop_dynamics(t, x, params, trajectory)
 
 % Author: Trey Copeland, jcopetre@gmail.com
 % Date: 2025-10-09
-
+       
     %% Step 1: Get reference state at current time
     x_ref = get_reference_state(t, trajectory);
     

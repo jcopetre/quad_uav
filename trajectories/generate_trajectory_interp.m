@@ -122,49 +122,43 @@ for axis = 1:3
 end
 
 %% Generate yaw trajectory
+%% Generate yaw trajectory
 trajectory.yaw = zeros(n_points, 1);
 
-% Interpolate or auto-calculate yaw
-if all(isnan(wpt_yaw))
-    % All auto: calculate from velocity direction
+% Handle first waypoint if NaN (default to facing north)
+if isnan(wpt_yaw(1))
+    wpt_yaw(1) = 0;
+end
+
+% Find all defined (non-NaN) waypoint indices
+defined_idx = find(~isnan(wpt_yaw));
+
+if ~isempty(defined_idx)
+    if length(defined_idx) == 1
+        % Only one defined yaw - hold it constant
+        trajectory.yaw(:) = wpt_yaw(defined_idx);
+    else
+        % Multiple defined yaws - interpolate between them
+        trajectory.yaw = interp1(wpt_time(defined_idx), wpt_yaw(defined_idx), ...
+                                 trajectory.time, 'pchip', 'extrap');
+        
+        % Clamp extrapolation: hold first/last values beyond boundaries
+        trajectory.yaw(trajectory.time < wpt_time(defined_idx(1))) = wpt_yaw(defined_idx(1));
+        trajectory.yaw(trajectory.time > wpt_time(defined_idx(end))) = wpt_yaw(defined_idx(end));
+    end
+else
+    % All NaN (shouldn't happen after defaulting first to 0, but be safe)
+    % Calculate from velocity direction
     for i = 1:n_points
         vx = trajectory.velocity(i, 1);
         vy = trajectory.velocity(i, 2);
-        if abs(vx) < 1e-6 && abs(vy) < 1e-6
-            % Stationary: maintain previous yaw (or zero for first point)
+        if sqrt(vx^2 + vy^2) > 1e-6
+            trajectory.yaw(i) = atan2(vy, vx);
+        else
             if i == 1
                 trajectory.yaw(i) = 0;
             else
                 trajectory.yaw(i) = trajectory.yaw(i-1);
-            end
-        else
-            trajectory.yaw(i) = atan2(vy, vx);
-        end
-    end
-elseif all(~isnan(wpt_yaw))
-    % All explicit: interpolate yaw angles
-    % Use PCHIP for yaw (unlike position) because:
-    % - Shape-preserving prevents overshoot in heading
-    % - Yaw can naturally hold constant between maneuvers
-    % - Reduces oscillation near large heading changes
-    trajectory.yaw = interp1(wpt_time, wpt_yaw, trajectory.time, 'pchip');
-else
-    % Mixed: interpolate explicit values, then fill in auto sections
-    explicit_idx = ~isnan(wpt_yaw);
-    trajectory.yaw = interp1(wpt_time(explicit_idx), wpt_yaw(explicit_idx), ...
-                             trajectory.time, 'linear', 'extrap');
-    
-    % For sections between auto waypoints, use velocity direction
-    for i = 1:length(wpt_time)-1
-        if isnan(wpt_yaw(i)) && isnan(wpt_yaw(i+1))
-            % Both waypoints are auto - use velocity direction
-            mask = trajectory.time >= wpt_time(i) & trajectory.time <= wpt_time(i+1);
-            for j = find(mask)'
-                vx = trajectory.velocity(j, 1);
-                vy = trajectory.velocity(j, 2);
-                if abs(vx) > 1e-6 || abs(vy) > 1e-6
-                    trajectory.yaw(j) = atan2(vy, vx);
-                end
             end
         end
     end

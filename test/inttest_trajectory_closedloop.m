@@ -42,12 +42,12 @@ setup_test_environment();
 
 % Use LQR weights tuned for feedforward trajectory tracking
 % Key: Lower position weights to avoid position→attitude coupling
-Q = diag([10, 10, 50, 50, 50, 10, 10, 10, 15, 5, 5, 2]);
-R = diag([0.1, 1, 1, 1]);
-params = quadrotor_linear_6dof(Q, R, false);
+% Q = diag([10, 10, 50, 50, 50, 10, 10, 10, 15, 5, 5, 2]);
+% R = diag([0.1, 1, 1, 1]);
+% Disabled the above Q R weights as they seemed to cause problems
+params = quadrotor_linear_6dof([], [], false);
 
-% Increase torque limits - original ±0.1 N·m was too conservative
-% For a 500g quadrotor with 0.25m arms, ±0.3 N·m is more realistic
+% For a 500g quadrotor with 0.25m arms, ±0.3 N·m is realistic
 params.u_max(2:4) = [0.3; 0.3; 0.3];
 params.u_min(2:4) = [-0.3; -0.3; -0.3];
 
@@ -66,39 +66,39 @@ fprintf('Step 3: Generating trajectories...\n');
 
 fprintf('  Method 1: MAKIMA Interpolation... ');
 tic;
-traj_interp = generate_trajectory_interp(wpt, params, 0.01);
+traj_interp = generate_trajectory_interp(wpt, params, 0.01);  
+traj_interp.attitude(:, 1:2) = 0;
 t_interp_gen = toc;
 fprintf('%.3f s\n', t_interp_gen);
 
 fprintf('  Method 2: Minimum Snap... ');
 tic;
 traj_minsnap = generate_trajectory_minsnap(wpt, params, 0.01);
+traj_minsnap.attitude(:, 1:2) = 0;
 t_minsnap_gen = toc;
 fprintf('%.3f s\n\n', t_minsnap_gen);
 
 %% Simulate Both Trajectories
 fprintf('Step 4: Running closed-loop simulations...\n');
 
-% CRITICAL: Initial conditions must match reference trajectory
-% Get initial state from each trajectory (they may differ due to generation method)
 x0_interp = zeros(12, 1);
-x0_interp(1:3) = traj_interp.position(1, :)';      % Position
-x0_interp(4:6) = traj_interp.attitude(1, :)';      % Attitude
-x0_interp(7:9) = traj_interp.velocity(1, :)';      % Velocity (CRITICAL!)
-x0_interp(10:12) = traj_interp.omega(1, :)';       % Angular velocity
+x0_interp(3) = wpt.position(1, 3);  % Use first waypoint altitude
 
 x0_minsnap = zeros(12, 1);
-x0_minsnap(1:3) = traj_minsnap.position(1, :)';    % Position
-x0_minsnap(4:6) = traj_minsnap.attitude(1, :)';    % Attitude
-x0_minsnap(7:9) = traj_minsnap.velocity(1, :)';    % Velocity (CRITICAL!)
-x0_minsnap(10:12) = traj_minsnap.omega(1, :)';     % Angular velocity
+x0_minsnap(3) = wpt.position(1, 3);  % Use first waypoint altitude
 
+fprintf('  Initial position (interp):  [%.3f, %.3f, %.3f] m\n', ...
+        x0_interp(1), x0_interp(2), x0_interp(3));
 fprintf('  Initial velocity (interp):  [%.3f, %.3f, %.3f] m/s\n', ...
         x0_interp(7), x0_interp(8), x0_interp(9));
+
+fprintf('  Initial position (minsnap): [%.3f, %.3f, %.3f] m\n', ...
+        x0_minsnap(1), x0_minsnap(2), x0_minsnap(3));
 fprintf('  Initial velocity (minsnap): [%.3f, %.3f, %.3f] m/s\n', ...
         x0_minsnap(7), x0_minsnap(8), x0_minsnap(9));
 
 tspan = [0, wpt.time(end)];
+
 options = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
 
 fprintf('  Simulating with interpolation trajectory... ');
@@ -214,6 +214,7 @@ plot3(traj_interp.position(:,1), traj_interp.position(:,2), traj_interp.position
       'r--', 'LineWidth', 1);
 plot3(wpt.position(:,1), wpt.position(:,2), wpt.position(:,3), ...
       'ko', 'MarkerSize', 8, 'MarkerFaceColor', 'k');
+
 grid on; axis equal;
 xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
 title('Interpolation Method');

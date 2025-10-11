@@ -243,3 +243,72 @@ function test_time_sampling()
     
     fprintf('PASS\n');
 end
+
+%% Test 9: First Yaw NaN (defaults to 0)
+function test_first_yaw_nan()
+    fprintf('Test 9: First yaw NaN handling... ');
+    
+    params = quadrotor_linear_6dof([], [], false);
+    
+    % First yaw is NaN, should default to 0
+    wpt.time = [0; 2; 4]';
+    wpt.position = [0 0 0; 1 0 0; 2 0 0];
+    wpt.yaw = [NaN; pi/4; pi/2];
+    
+    trajectory = generate_trajectory_interp(wpt, params, 0.1);
+    
+    % First yaw should be 0 (defaulted from NaN)
+    assert(abs(trajectory.yaw(1)) < 0.01, 'First yaw should default to 0');
+    
+    % Should interpolate to subsequent values
+    assert(all(isfinite(trajectory.yaw)), 'All yaw values should be finite');
+    
+    fprintf('PASS\n');
+end
+
+%% Test 10: All NaN except first (hold constant)
+function test_single_defined_yaw()
+    fprintf('Test 10: Single defined yaw (hold constant)... ');
+    
+    params = quadrotor_linear_6dof([], [], false);
+    
+    % Only first has value (after NaN→0 conversion), rest NaN
+    wpt.time = [0; 2]';
+    wpt.position = [0 0 0; 2 0 0];
+    wpt.yaw = [0; NaN];  % After conversion: [0; NaN] → only one defined
+    
+    trajectory = generate_trajectory_interp(wpt, params, 0.1);
+    
+    % Should hold yaw=0 throughout
+    assert(all(abs(trajectory.yaw) < 0.01), 'Should hold constant yaw=0');
+    
+    fprintf('PASS\n');
+end
+
+%% Test 11: Mixed NaN pattern
+function test_mixed_nan_pattern()
+    fprintf('Test 11: Mixed NaN pattern... ');
+    
+    params = quadrotor_linear_6dof([], [], false);
+    
+    % Pattern: defined, NaN, defined, NaN, defined
+    wpt.time = [0; 1; 2; 3; 4]';
+    wpt.position = [0 0 0; 1 0 0; 2 0 0; 3 0 0; 4 0 0];
+    wpt.yaw = [0; NaN; pi/2; NaN; pi];
+    
+    trajectory = generate_trajectory_interp(wpt, params, 0.1);
+    
+    % Should interpolate between defined values
+    assert(all(isfinite(trajectory.yaw)), 'All yaw should be finite');
+    
+    % Check interpolation at waypoints
+    [~, idx1] = min(abs(trajectory.time - 0));
+    [~, idx3] = min(abs(trajectory.time - 2));
+    [~, idx5] = min(abs(trajectory.time - 4));
+    
+    assert(abs(trajectory.yaw(idx1) - 0) < 0.1, 'Waypoint 1 yaw incorrect');
+    assert(abs(trajectory.yaw(idx3) - pi/2) < 0.1, 'Waypoint 3 yaw incorrect');
+    assert(abs(trajectory.yaw(idx5) - pi) < 0.1, 'Waypoint 5 yaw incorrect');
+    
+    fprintf('PASS\n');
+end
