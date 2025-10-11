@@ -171,17 +171,70 @@ else
 end
 
 %% Compute feedforward attitude (roll and pitch) from acceleration
+% For a quadrotor, the thrust vector must oppose the net force vector:
+%   F_net = m*a_desired + m*g*[0; 0; 1]
+%
+% In the small-angle approximation:
+%   pitch ≈ asin(ax / g)           (positive pitch for forward accel)
+%   roll  ≈ asin(-ay / (g*cos(θ))) (negative roll for rightward accel)
+%
+% These feedforward attitudes help the LQR controller by providing the
+% reference orientation needed to achieve desired accelerations.
+
 trajectory.roll = zeros(n_points, 1);
 trajectory.pitch = zeros(n_points, 1);
+
+for i = 1:n_points
+    ax = trajectory.acceleration(i, 1);
+    ay = trajectory.acceleration(i, 2);
+    
+    % Compute required pitch from forward acceleration
+    % Clamp argument to prevent numerical issues (limit to ±45°)
+    pitch_arg = ax / params.g;
+    pitch_arg = max(-0.707, min(0.707, pitch_arg));  % sin(45°) ≈ 0.707
+    trajectory.pitch(i) = asin(pitch_arg);
+    
+    % Compute required roll from lateral acceleration
+    cos_theta = cos(trajectory.pitch(i));
+    if abs(cos_theta) > 0.1  % Avoid division by zero near 90° pitch
+        roll_arg = -ay / (params.g * cos_theta);
+        roll_arg = max(-0.707, min(0.707, roll_arg));
+        trajectory.roll(i) = asin(roll_arg);
+    else
+        % Near vertical flight - no meaningful roll correction
+        trajectory.roll(i) = 0;
+    end
+end
+
+fprintf('  Max roll: %.2f deg\n', max(abs(rad2deg(trajectory.roll))));
+fprintf('  Max pitch: %.2f deg\n', max(abs(rad2deg(trajectory.pitch))));
 
 %% Assemble attitude vector
 trajectory.attitude = [trajectory.roll, trajectory.pitch, trajectory.yaw];
 
-%% Compute angular velocity (omega) from Euler angle rates
-% Since feedforward attitude is disabled (roll=0, pitch=0),
-% set omega to zero. The controller will generate required angular
-% velocities dynamically during flight.
+%% Compute angular velocity for trajectory tracking
+% CRITICAL: Angular velocity should be minimal for feedforward trajectories.
+% The feedforward attitudes are kinematic (orientation needed for acceleration)
+% but don't imply specific angular velocities.
+%
+% Setting omega from Euler angle derivatives causes massive numerical errors:
+%   - Original approach: omega = W^-1 * euler_dot → 1800+ deg/s (impossible!)
+%   - New approach: Set p=q=0, compute r from yaw changes
+%
+% This allows the LQR controller to determine how fast to rotate based on
+% tracking error and gains, rather than demanding impossible angular velocities.
+
 trajectory.omega = zeros(n_points, 3);
+
+% Compute yaw rate for coordinated turns
+yaw_rate = gradient(trajectory.yaw, dt);
+
+% Limit to reasonable values (avoid wrap-around issues)
+max_yaw_rate = deg2rad(90);  % 90 deg/s maximum
+yaw_rate = max(-max_yaw_rate, min(max_yaw_rate, yaw_rate));
+
+trajectory.omega(:, 3) = yaw_rate;  % r (yaw rate only)
+% p and q remain zero - let controller handle roll/pitch changes
 
 %% Display summary
 fprintf('Generated trajectory:\n');

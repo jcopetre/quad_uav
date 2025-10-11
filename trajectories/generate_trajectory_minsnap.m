@@ -621,32 +621,45 @@ end
 
 
 function omega = compute_angular_velocity(trajectory, dt)
-% COMPUTE_ANGULAR_VELOCITY - Compute body rates from Euler angle rates
+% COMPUTE_ANGULAR_VELOCITY - Compute body rates for trajectory tracking
+%
+% CRITICAL FIX: The original implementation computed omega from Euler angle
+% rate derivatives, which caused massive numerical errors (1800+ deg/s).
+%
+% ROOT CAUSE:
+%   - Euler angles have discontinuities (wrap at ±180°)
+%   - Numerical derivatives amplify these discontinuities
+%   - Transformation W^-1 further amplifies errors near gimbal lock
+%   - Result: Physically impossible angular velocities → 100% saturation
+%
+% NEW APPROACH:
+%   For feedforward trajectories, omega should be minimal:
+%   - Feedforward attitudes (roll, pitch) are kinematic - they specify
+%     orientation needed for desired acceleration, NOT rotation rates
+%   - Roll/pitch rates (p, q): Set to zero - let controller handle tilting
+%   - Yaw rate (r): Derived from desired heading change for coordinated turns
+%
+% BENEFITS:
+%   - Physically reasonable values (< 90 deg/s)
+%   - No saturation from tracking impossible angular velocities
+%   - Controller focuses on position/velocity tracking
+%   - Attitude naturally follows from LQR feedback
 
     n_points = length(trajectory.time);
     omega = zeros(n_points, 3);
     
-    % Euler angle rates (numerical derivative)
-    euler_dot = gradient(trajectory.attitude, dt);
+    % Compute desired yaw rate from trajectory
+    % Use smooth derivative to avoid numerical issues
+    yaw_rate = gradient(trajectory.yaw, dt);
     
-    for i = 1:n_points
-        phi = trajectory.roll(i);
-        theta = trajectory.pitch(i);
-        
-        c_phi = cos(phi);
-        s_phi = sin(phi);
-        c_theta = cos(theta);
-        
-        if abs(c_theta) < 0.1
-            % Near gimbal lock - use simplified model
-            omega(i, :) = euler_dot(i, :);
-        else
-            % Full transformation: [p; q; r] = W^(-1) * [phi_dot; theta_dot; psi_dot]
-            W_inv = [1,  0,           -sin(theta);
-                     0,  cos(phi),     sin(phi)*cos(theta);
-                     0, -sin(phi),     cos(phi)*cos(theta)] / cos(theta);
-            
-            omega(i, :) = (W_inv * euler_dot(i, :)')';
-        end
-    end
+    % Limit yaw rate to reasonable values (avoid wrap-around issues at ±π)
+    max_yaw_rate = deg2rad(90);  % 90 deg/s is aggressive but achievable
+    yaw_rate = max(-max_yaw_rate, min(max_yaw_rate, yaw_rate));
+    
+    % Set only yaw rate (r component)
+    omega(:, 3) = yaw_rate;
+    
+    % p and q remain zero - feedforward attitudes provide the reference
+    % orientation, but the controller determines how fast to achieve it
+    % based on the tracking error and LQR gains
 end

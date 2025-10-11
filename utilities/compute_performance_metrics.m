@@ -121,6 +121,66 @@ function metrics = compute_performance_metrics(t, x, trajectory, params, u_log)
     max_deviation = max(sqrt(sum((x(:,1:3) - ref_final).^2, 2)));
     metrics.stability.overshoot = max_deviation / norm(ref_final);
     
+    %% Linearization Validity Metrics
+    % The LQR controller is designed using small-angle linearization around hover.
+    % Track violations of linearization assumptions to warn users when results
+    % may be unreliable.
+    
+    % Small-angle approximation validity: |θ| < 15° (sin(θ) ≈ θ within 1%)
+    SMALL_ANGLE_LIMIT = deg2rad(15);  % 15 degrees
+    
+    % Angular velocity limit for linearization: |ω| < 1 rad/s (~57 deg/s)
+    ANGULAR_VEL_LIMIT = 1.0;  % rad/s
+    
+    % Check reference trajectory demands
+    ref_attitudes = zeros(length(t), 3);
+    for i = 1:length(t)
+        x_ref_i = get_reference_state(t(i), trajectory);
+        ref_attitudes(i, :) = x_ref_i(4:6);
+    end
+    
+    metrics.linearity.max_ref_roll = max(abs(ref_attitudes(:,1)));
+    metrics.linearity.max_ref_pitch = max(abs(ref_attitudes(:,2)));
+    metrics.linearity.max_ref_attitude = max(abs(ref_attitudes(:,1:2)), [], 'all');
+    
+    metrics.linearity.max_actual_roll = max(abs(x(:,4)));
+    metrics.linearity.max_actual_pitch = max(abs(x(:,5)));
+    metrics.linearity.max_actual_attitude = max(abs(x(:,4:5)), [], 'all');
+    
+    metrics.linearity.max_angular_velocity = max(sqrt(sum(x(:,10:12).^2, 2)));
+    
+    % Violation flags
+    metrics.linearity.ref_exceeds_small_angle = (metrics.linearity.max_ref_attitude > SMALL_ANGLE_LIMIT);
+    metrics.linearity.actual_exceeds_small_angle = (metrics.linearity.max_actual_attitude > SMALL_ANGLE_LIMIT);
+    metrics.linearity.angular_vel_excessive = (metrics.linearity.max_angular_velocity > ANGULAR_VEL_LIMIT);
+    
+    % Overall linearity violation flag
+    metrics.linearity.violated = metrics.linearity.ref_exceeds_small_angle || ...
+                                  metrics.linearity.actual_exceeds_small_angle || ...
+                                  metrics.linearity.angular_vel_excessive;
+    
+    % Compute percentage of time in violation
+    ref_attitude_magnitude = sqrt(sum(ref_attitudes(:,1:2).^2, 2));
+    actual_attitude_magnitude = sqrt(sum(x(:,4:5).^2, 2));
+    angular_vel_magnitude = sqrt(sum(x(:,10:12).^2, 2));
+    
+    metrics.linearity.time_ref_violated_pct = 100 * sum(ref_attitude_magnitude > SMALL_ANGLE_LIMIT) / length(t);
+    metrics.linearity.time_actual_violated_pct = 100 * sum(actual_attitude_magnitude > SMALL_ANGLE_LIMIT) / length(t);
+    metrics.linearity.time_ang_vel_violated_pct = 100 * sum(angular_vel_magnitude > ANGULAR_VEL_LIMIT) / length(t);
+    
+    % Severity assessment
+    if metrics.linearity.violated
+        if metrics.linearity.max_actual_attitude > deg2rad(30)
+            metrics.linearity.severity = 'SEVERE';  % >30° - linearization completely invalid
+        elseif metrics.linearity.max_actual_attitude > deg2rad(20)
+            metrics.linearity.severity = 'MODERATE';  % 20-30° - results questionable
+        else
+            metrics.linearity.severity = 'MILD';  % 15-20° - marginal validity
+        end
+    else
+        metrics.linearity.severity = 'NONE';
+    end
+
     %% Success Criteria
     % Define success as meeting all critical thresholds
     metrics.success.completed = (t(end) >= trajectory.time(end) * 0.99);  % Reached end time
@@ -152,5 +212,4 @@ function metrics = compute_performance_metrics(t, x, trajectory, params, u_log)
     
     metrics.summary = w_pos * pos_score + w_att * att_score + w_ctrl * ctrl_score;
     metrics.summary_weighted = metrics.summary / (w_pos + w_att + w_ctrl);  % Normalize to [0,1]
-
 end
