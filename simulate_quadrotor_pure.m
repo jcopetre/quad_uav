@@ -155,23 +155,18 @@ function results = simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
         fprintf('  Duration: %.1f seconds\n', wpt.time(end) - wpt.time(1));
     end
     
-    % Generate smooth trajectory
+    % Generate smooth trajectory using automatic method selection
     if verbose
-        fprintf('\nStep 3/6: Preparing trajectory from waypoints...\n');
+        fprintf('\nStep 3/6: Generating trajectory...\n');
     end
     
-    % Use waypoints directly as sparse trajectory
-    % get_reference_state() will interpolate on-the-fly during simulation
-    trajectory.time = wpt.time;
-    trajectory.position = wpt.position;
-    trajectory.velocity = zeros(length(wpt.time), 3);  % Zero velocity at waypoints
-    trajectory.attitude = zeros(length(wpt.time), 3);  % Level flight
-    trajectory.omega = zeros(length(wpt.time), 3);     % No angular velocity
+    trajectory = generate_trajectory_auto(wpt, params, options.dt);
     
     if verbose
-        fprintf('  Trajectory: %d waypoints\n', length(wpt.time));
-        fprintf('  Duration: %.1f seconds\n', wpt.time(end) - wpt.time(1));
-        fprintf('  Note: Using sparse waypoints; interpolation done on-the-fly\n');
+        fprintf('  Method selected: %s\n', trajectory.method);
+        fprintf('  Reason: %s\n', trajectory.method_reason);
+        fprintf('  Max velocity: %.2f m/s\n', max(vecnorm(trajectory.velocity, 2, 2)));
+        fprintf('  Max acceleration: %.2f m/s²\n', max(vecnorm(trajectory.acceleration, 2, 2)));
     end
     
     %% ========================================================================

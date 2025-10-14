@@ -271,6 +271,13 @@ function [Aeq, beq] = build_minsnap_constraints(pos, vel, acc, T, N_seg, vel_spe
 %
 % Minimum snap trajectory optimization following Mellinger & Kumar (2011).
 %
+% CRITICAL FIX: Interior waypoints must constrain BOTH:
+%   1. The END of the segment arriving at the waypoint
+%   2. The START of the segment departing from the waypoint
+%
+% Without both constraints, segments can "miss" waypoints while maintaining
+% continuity, leading to high accelerations and poor tracking.
+%
 % REFERENCES:
 %   Mellinger, D., & Kumar, V. (2011). "Minimum snap trajectory generation
 %   and control for quadrotors." IEEE International Conference on Robotics
@@ -290,27 +297,51 @@ function [Aeq, beq] = build_minsnap_constraints(pos, vel, acc, T, N_seg, vel_spe
     Aeq(row, idx) = poly_coeffs(0, 2); beq(row) = acc(1); row = row + 1;
     Aeq(row, idx) = poly_coeffs(0, 3); beq(row) = 0; row = row + 1;
 
-    %% INTERIOR waypoints: position always, vel/acc if user-specified
+    %% INTERIOR waypoints: constrain BOTH segments at the waypoint
     for seg = 1:N_seg-1
-        wp = seg + 1;  % Waypoint index
-        idx = (seg-1)*8 + (1:8);
-        t = T(seg);
+        wp = seg + 1;  % Waypoint index (e.g., wp=2 for waypoint between seg 1 and 2)
         
-        % Position (always enforced)
-        Aeq(row, idx) = poly_coeffs(t, 0);
+        % Segment indices
+        idx_end = (seg-1)*8 + (1:8);   % Segment ending at this waypoint
+        idx_start = seg*8 + (1:8);      % Segment starting from this waypoint
+        
+        % Time values
+        t_end = T(seg);    % End time of segment ending here
+        t_start = 0;       % Start time of segment starting here (always 0 in local coords)
+        
+        %% Position constraints (ALWAYS enforced at waypoints)
+        % Constrain end of arriving segment
+        Aeq(row, idx_end) = poly_coeffs(t_end, 0);
         beq(row) = pos(wp);
         row = row + 1;
         
-        % Velocity (enforce if user explicitly specified)
+        % Constrain start of departing segment
+        Aeq(row, idx_start) = poly_coeffs(t_start, 0);
+        beq(row) = pos(wp);
+        row = row + 1;
+        
+        %% Velocity constraints (only if user explicitly specified)
         if vel_specified(wp)
-            Aeq(row, idx) = poly_coeffs(t, 1);
+            % Constrain end of arriving segment
+            Aeq(row, idx_end) = poly_coeffs(t_end, 1);
+            beq(row) = vel(wp);
+            row = row + 1;
+            
+            % Constrain start of departing segment
+            Aeq(row, idx_start) = poly_coeffs(t_start, 1);
             beq(row) = vel(wp);
             row = row + 1;
         end
         
-        % Acceleration (enforce if user explicitly specified)
+        %% Acceleration constraints (only if user explicitly specified)
         if acc_specified(wp)
-            Aeq(row, idx) = poly_coeffs(t, 2);
+            % Constrain end of arriving segment
+            Aeq(row, idx_end) = poly_coeffs(t_end, 2);
+            beq(row) = acc(wp);
+            row = row + 1;
+            
+            % Constrain start of departing segment
+            Aeq(row, idx_start) = poly_coeffs(t_start, 2);
             beq(row) = acc(wp);
             row = row + 1;
         end
@@ -324,39 +355,57 @@ function [Aeq, beq] = build_minsnap_constraints(pos, vel, acc, T, N_seg, vel_spe
     Aeq(row, idx) = poly_coeffs(t_end, 2); beq(row) = acc(N); row = row + 1;
     Aeq(row, idx) = poly_coeffs(t_end, 3); beq(row) = 0; row = row + 1;
 
-    %% Continuity at interior waypoints
+    %% Continuity at interior waypoints (for higher derivatives)
+    % NOTE: Position/velocity/acceleration continuity is already enforced
+    % by the waypoint constraints above. We only need continuity for
+    % derivatives NOT explicitly constrained at waypoints.
+    %
+    % For interior waypoints WITHOUT explicit velocity constraints:
+    %   - Position is constrained (waypoints above)
+    %   - Velocity continuity needed
+    %   - Acceleration continuity needed
+    %   - Jerk continuity needed
+    %   - Snap continuity needed
+    %
+    % For interior waypoints WITH explicit velocity constraints:
+    %   - Position is constrained (waypoints above)
+    %   - Velocity is constrained (waypoints above)
+    %   - Acceleration continuity needed (if not constrained)
+    %   - Jerk continuity needed
+    %   - Snap continuity needed
+    
     for seg = 1:N_seg-1
+        wp = seg + 1;  % Waypoint index
+        
         idx = (seg-1)*8 + (1:8);
         idx_next = seg*8 + (1:8);
         
         t = T(seg);
         t_next = 0;
         
-        % Position continuity
-        Aeq(row, idx) = poly_coeffs(t, 0);
-        Aeq(row, idx_next) = -poly_coeffs(t_next, 0);
-        beq(row) = 0;
-        row = row + 1;
+        % Velocity continuity (only if NOT explicitly constrained)
+        if ~vel_specified(wp)
+            Aeq(row, idx) = poly_coeffs(t, 1);
+            Aeq(row, idx_next) = -poly_coeffs(t_next, 1);
+            beq(row) = 0;
+            row = row + 1;
+        end
         
-        % Velocity continuity
-        Aeq(row, idx) = poly_coeffs(t, 1);
-        Aeq(row, idx_next) = -poly_coeffs(t_next, 1);
-        beq(row) = 0;
-        row = row + 1;
+        % Acceleration continuity (only if NOT explicitly constrained)
+        if ~acc_specified(wp)
+            Aeq(row, idx) = poly_coeffs(t, 2);
+            Aeq(row, idx_next) = -poly_coeffs(t_next, 2);
+            beq(row) = 0;
+            row = row + 1;
+        end
         
-        % Acceleration continuity
-        Aeq(row, idx) = poly_coeffs(t, 2);
-        Aeq(row, idx_next) = -poly_coeffs(t_next, 2);
-        beq(row) = 0;
-        row = row + 1;
-        
-        % Jerk continuity
+        % Jerk continuity (always needed for smoothness)
         Aeq(row, idx) = poly_coeffs(t, 3);
         Aeq(row, idx_next) = -poly_coeffs(t_next, 3);
         beq(row) = 0;
         row = row + 1;
         
-        % Snap continuity
+        % Snap continuity (always needed for C⁴ continuity)
         Aeq(row, idx) = poly_coeffs(t, 4);
         Aeq(row, idx_next) = -poly_coeffs(t_next, 4);
         beq(row) = 0;

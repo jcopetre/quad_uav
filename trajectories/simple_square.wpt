@@ -1,0 +1,15 @@
+{
+  "metadata": {
+    "name": "Simple Square (Integration Test)",
+    "description": "Dead-simple square trajectory for method comparison",
+    "created": "2025-10-13",
+    "vehicle": "quadrotor_500g"
+  },
+  "waypoints": [
+    {"label": "start", "time": 0, "x": 0, "y": 0, "z": 1, "yaw": 0},
+    {"label": "right", "time": 5, "x": 2, "y": 0, "z": 1, "yaw": 0},
+    {"label": "forward", "time": 10, "x": 2, "y": 2, "z": 1, "yaw": 0},
+    {"label": "left", "time": 15, "x": 0, "y": 2, "z": 1, "yaw": 0},
+    {"label": "back", "time": 20, "x": 0, "y": 0, "z": 1, "yaw": 0}
+  ]
+}

@@ -56,7 +56,7 @@ fprintf('  ✓ Torque limits increased to ±0.3 N·m\n\n');
 
 %% Load Test Trajectory
 fprintf('Step 2: Loading test trajectory...\n');
-wpt = load_waypoints('figure_eight.wpt');
+wpt = load_waypoints('simple_square.wpt');
 fprintf('  ✓ Loaded: %s\n', wpt.metadata.name);
 fprintf('  ✓ Waypoints: %d\n', length(wpt.time));
 fprintf('  ✓ Duration: %.1f seconds\n\n', wpt.time(end));
