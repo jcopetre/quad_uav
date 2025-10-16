@@ -2,7 +2,7 @@ clear, clc, close all
 
 % Basic test simply reproduces quick_test_sim.m
 % Basic test
-simulate_quadrotor_pure('basic_maneuver.wpt');
+% simulate_quadrotor_pure('basic_maneuver.wpt');
 
 % Basic test with manual Q and R settings
 % Q = diag([200 200 200 10 10 1 20 20 20 1 1 0.1]);
