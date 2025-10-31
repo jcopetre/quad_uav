@@ -94,14 +94,14 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     fprintf('=======================================================\n\n');
     
     %% Load Data
-    fprintf('[1/7] Loading nominal simulation...\n');
+    fprintf('[1] Loading nominal simulation...\n');
     nominal_file = fullfile(results_dir, 'nominal.mat');
     if ~exist(nominal_file, 'file')
         error('Nominal data file not found: %s', nominal_file);
     end
     nominal = DataManager.load_results(nominal_file);
     
-    fprintf('[2/7] Loading Monte Carlo results...\n');
+    fprintf('[2] Loading Monte Carlo results...\n');
     mc_file = fullfile(results_dir, 'monte_carlo.mat');
     if ~exist(mc_file, 'file')
         error('Monte Carlo data file not found: %s', mc_file);
@@ -110,42 +110,35 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     mc = DataManager.load_results(mc_file, struct('validate', false, 'migrate', false));
     
     %% Generate Figures
-    fprintf('[3/7] Creating 3D tracking visualization...\n');
+    fprintf('[3] Creating 3D tracking visualization...\n');
     fig1 = create_3d_tracking_figure(nominal);
     saveas(fig1, fullfile(figures_dir, 'square_tracking_3d.png'));
     if options.close_figures
         close(fig1);
     end
     
-    fprintf('[4/7] Creating tracking timeseries...\n');
+    fprintf('[4] Creating tracking timeseries...\n');
     fig2 = create_tracking_timeseries(nominal);
     saveas(fig2, fullfile(figures_dir, 'tracking_timeseries.png'));
     if options.close_figures
         close(fig2);
     end
     
-    fprintf('[5/7] Creating control inputs plot...\n');
+    fprintf('[5] Creating control inputs plot...\n');
     fig3 = create_control_inputs_figure(nominal);
     saveas(fig3, fullfile(figures_dir, 'control_inputs.png'));
     if options.close_figures
         close(fig3);
     end
     
-    % fprintf('[6/7] Creating Monte Carlo boxplots...\n');
-    % fig4 = create_mc_boxplots(mc);
-    % saveas(fig4, fullfile(figures_dir, 'mc_boxplots.png'));
-    % close(fig4);
-    % 
-    % fprintf('[7/7] Creating correlation and distribution plots...\n');
-    % fig5 = create_correlation_heatmap(mc);
-    % saveas(fig5, fullfile(figures_dir, 'mc_correlation.png'));
-    % close(fig5);
-    %
-    % fig6 = create_parameter_distributions(mc);
-    % saveas(fig6, fullfile(figures_dir, 'mc_distributions.png'));
-    % close(fig6);
+    fprintf('[6] Creating attitdue dynamics...\n');
+    fig4 = create_attitude_dynamics_figure(nominal);
+    saveas(fig4, fullfile(figures_dir, 'attitude_dynamics.png'));
+    if options.close_figures
+        close(fig3);
+    end
 
-    fprintf('[6/7] Running Monte Carlo analysis and generating plots...\n');
+    fprintf('[7] Running Monte Carlo analysis and generating plots...\n');
     analysis_options.plot = true;
     analysis_options.save_plots = true;
     analysis_options.plot_dir = figures_dir;
@@ -154,7 +147,7 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     
     analysis = analyze_monte_carlo_results(mc, analysis_options);
     
-    fprintf('[7/7] Copying MC figures to output directory...\n');
+    fprintf('[8] Copying MC figures to output directory...\n');
     % analyze_monte_carlo_results already saved figures to figures_dir
     % Just confirm they exist
     mc_figure_files = {'distributions.png', 'boxplots.png', 'correlation.png'};
@@ -180,6 +173,7 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     fprintf('  - square_tracking_3d.png\n');
     fprintf('  - tracking_timeseries.png\n');
     fprintf('  - control_inputs.png\n');
+    fprintf('  - attitude_dynamics.png\n');
     fprintf('  - mc_boxplots.png\n');
     fprintf('  - mc_correlation.png\n');
     fprintf('  - mc_distributions.png\n');
@@ -334,59 +328,26 @@ function fig = create_tracking_timeseries(nominal)
     traj = nominal.trajectory;
     pos_ref = interp1(traj.time, traj.position, t, 'linear', 'extrap');
     
-    % Load waypoints if available
-    waypoint_times = [];
-    waypoint_labels = {};
-    if isfield(nominal, 'config') && isfield(nominal.config, 'trajectory_file')
-        try
-            wpt = load_waypoints(nominal.config.trajectory_file);
-            waypoint_times = wpt.time;
-            if isfield(wpt, 'labels')
-                waypoint_labels = wpt.labels;
-            end
-        catch
-            % Skip waypoints if loading fails
-        end
-    end
-    
     labels = {'X', 'Y', 'Z'};
     for i = 1:3
         subplot(3,1,i);
         plot(t, pos_ref(:,i), 'r--', 'LineWidth', 1.5); hold on;
         plot(t, pos(:,i), 'b-', 'LineWidth', 1);
-        
-        % Add vertical lines at waypoint times
-        if ~isempty(waypoint_times)
-            y_limits = ylim;
-            for j = 1:length(waypoint_times)
-                line([waypoint_times(j) waypoint_times(j)], y_limits, ...
-                     'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 1);
-                
-                % Add waypoint label at top of plot
-                if ~isempty(waypoint_labels) && j <= length(waypoint_labels)
-                    text(waypoint_times(j), y_limits(2), sprintf(' %s', waypoint_labels{j}), ...
-                         'VerticalAlignment', 'top', 'FontSize', 7, 'Color', [0.4 0.4 0.4]);
-                end
-            end
-        end
-        
         ylabel(sprintf('%s (m)', labels{i}));
         grid on;
-        
+        legend('Reference', 'Actual', 'Location', 'best');
         if i == 1
-            if ~isempty(waypoint_times)
-                legend('Reference', 'Actual', 'Waypoint', 'Location', 'best');
-            else
-                legend('Reference', 'Actual', 'Location', 'best');
-            end
             title('Position Tracking vs Time');
         end
+        
+        % Add waypoint markers (labels only on first subplot)
+        add_waypoint_markers(nominal, true, i, 3);
     end
     xlabel('Time (s)');
 end
 
 function fig = create_control_inputs_figure(nominal)
-    % Create control inputs visualization
+    % Create control inputs visualization with waypoint markers
     
     fig = figure('Position', [100 100 1000 700]);
     
@@ -395,180 +356,139 @@ function fig = create_control_inputs_figure(nominal)
     
     % Thrust
     subplot(4,1,1);
-    plot(t, u(:,1), 'b-', 'LineWidth', 1);
-    ylabel('Thrust (N)');
+    plot(t, u(:,1), 'b-', 'LineWidth', 1.5);
+    ylabel('Thrust (N)', 'FontSize', 10);
     grid on;
-    title('Control Inputs vs Time');
+    title('Control Inputs vs Time', 'FontSize', 12, 'FontWeight', 'bold');
+    add_waypoint_markers(nominal, true, 1, 4);  % Labels on top
     
     % Torques
-    labels = {'\tau_x', '\tau_y', '\tau_z'};
+    labels = {'\tau_\phi (Roll)', '\tau_\theta (Pitch)', '\tau_\psi (Yaw)'};
     for i = 1:3
         subplot(4,1,i+1);
-        plot(t, u(:,i+1), 'b-', 'LineWidth', 1);
-        ylabel(sprintf('%s (N·m)', labels{i}));
+        plot(t, u(:,i+1), 'b-', 'LineWidth', 1.5);
+        ylabel(sprintf('%s (N·m)', labels{i}), 'FontSize', 10);
         grid on;
+        
+        % Add waypoint markers (no labels on lower subplots)
+        add_waypoint_markers(nominal, true, i+1, 4);
     end
-    xlabel('Time (s)');
+    
+    xlabel('Time (s)', 'FontSize', 10);
 end
 
-% function fig = create_mc_boxplots(mc)
-%     % Create Monte Carlo performance boxplots
-% 
-%     fig = figure('Position', [100 100 1200 500]);
-% 
-%     % Extract metrics from successful trials
-%     success_flags = [mc.trials.success];
-%     successful_trials = mc.trials(success_flags);
-% 
-%     if isempty(successful_trials)
-%         text(0.5, 0.5, 'No successful trials to plot', ...
-%              'HorizontalAlignment', 'center');
-%         return;
-%     end
-% 
-%     % Extract position RMSE
-%     position_rmse = arrayfun(@(t) t.metrics.tracking.rmse_position, successful_trials);
-% 
-%     % Extract attitude RMSE
-%     attitude_rmse = arrayfun(@(t) t.metrics.tracking.rmse_attitude, successful_trials);
-% 
-%     % Extract control effort (if available)
-%     has_control = isfield(successful_trials(1).metrics, 'control') && ...
-%                   ~isempty(fieldnames(successful_trials(1).metrics.control));
-% 
-%     % Position RMSE boxplot
-%     subplot(1,3,1);
-%     boxplot(position_rmse);
-%     ylabel('Position RMSE (m)');
-%     title('Position Tracking Error');
-%     grid on;
-% 
-%     % Attitude RMSE boxplot
-%     subplot(1,3,2);
-%     boxplot(rad2deg(attitude_rmse));
-%     ylabel('Attitude RMSE (deg)');
-%     title('Attitude Tracking Error');
-%     grid on;
-% 
-%     % Control effort boxplot
-%     subplot(1,3,3);
-%     if has_control
-%         control_effort = arrayfun(@(t) t.metrics.control.total_effort, successful_trials);
-%         boxplot(control_effort);
-%         ylabel('Control Effort');
-%         title('Control Effort Distribution');
-%     else
-%         text(0.5, 0.5, 'Control effort not available', ...
-%              'HorizontalAlignment', 'center');
-%     end
-%     grid on;
-% 
-%     n_trials = length(mc.trials);
-%     sgtitle(sprintf('Monte Carlo Performance (N=%d trials, %d successful)', ...
-%                     n_trials, length(successful_trials)));
-% end
-% 
-% function fig = create_correlation_heatmap(mc)
-%     % Create parameter-performance correlation heatmap
-% 
-%     fig = figure('Position', [100 100 900 700]);
-% 
-%     % Extract successful trials
-%     success_flags = [mc.trials.success];
-%     successful_trials = mc.trials(success_flags);
-% 
-%     if isempty(successful_trials)
-%         text(0.5, 0.5, 'No successful trials to analyze', ...
-%              'HorizontalAlignment', 'center');
-%         return;
-%     end
-% 
-%     % Extract parameters from perturbation config
-%     param_names = mc.config.perturb_config.params(:, 1);
-%     n_params = length(param_names);
-%     n_trials = length(successful_trials);
-% 
-%     % Build parameter matrix
-%     param_matrix = zeros(n_trials, n_params);
-%     for i = 1:n_trials
-%         for j = 1:n_params
-%             param_matrix(i, j) = successful_trials(i).params.(param_names{j});
-%         end
-%     end
-% 
-%     % Extract metrics (ensure column vectors)
-%     rmse_position = arrayfun(@(t) t.metrics.tracking.rmse_position, successful_trials)';
-%     rmse_attitude = arrayfun(@(t) t.metrics.tracking.rmse_attitude, successful_trials)';
-% 
-%     % Compute correlations
-%     metric_names = {'Position RMSE', 'Attitude RMSE'};
-%     corr_matrix = zeros(2, n_params);
-% 
-%     for j = 1:n_params
-%         corr_matrix(1, j) = corr(param_matrix(:, j), rmse_position);
-%         corr_matrix(2, j) = corr(param_matrix(:, j), rmse_attitude);
-%     end
-% 
-%     % Plot heatmap
-%     imagesc(corr_matrix);
-%     colormap(redblue());
-%     colorbar;
-%     caxis([-1 1]);
-% 
-%     % Labels
-%     set(gca, 'XTick', 1:n_params, 'XTickLabel', param_names);
-%     set(gca, 'YTick', 1:2, 'YTickLabel', metric_names);
-%     xtickangle(45);
-% 
-%     title('Parameter-Performance Correlation Matrix');
-% 
-%     % Add correlation values
-%     for i = 1:2
-%         for j = 1:n_params
-%             val = corr_matrix(i,j);
-%             if abs(val) > 0.3
-%                 text(j, i, sprintf('%.2f', val), ...
-%                      'HorizontalAlignment', 'center', ...
-%                      'Color', 'k', 'FontWeight', 'bold');
-%             end
-%         end
-%     end
-% end
-% 
-% function fig = create_parameter_distributions(mc)
-%     % Create parameter distribution histograms
-% 
-%     fig = figure('Position', [100 100 1200 800]);
-% 
-%     % Extract parameters from perturbation config
-%     param_names = mc.config.perturb_config.params(:, 1);
-%     n_params = length(param_names);
-%     n_trials = length(mc.trials);
-% 
-%     % Build parameter matrix (all trials, not just successful)
-%     param_matrix = zeros(n_trials, n_params);
-%     for i = 1:n_trials
-%         for j = 1:n_params
-%             param_matrix(i, j) = mc.trials(i).params.(param_names{j});
-%         end
-%     end
-% 
-%     % Plot distributions (max 9 subplots)
-%     n_plots = min(n_params, 9);
-%     for i = 1:n_plots
-%         subplot(3, 3, i);
-%         pname = param_names{i};
-%         values = param_matrix(:, i);
-% 
-%         histogram(values, 30, 'Normalization', 'pdf');
-%         xlabel(strrep(pname, '_', '\_'));  % Escape underscores for LaTeX
-%         ylabel('Probability Density');
-%         title(sprintf('%s Distribution', strrep(pname, '_', ' ')));
-%         grid on;
-%     end
-% 
-%     sgtitle(sprintf('Perturbed Parameter Distributions (N=%d trials)', n_trials));
-% end
+function fig = create_attitude_dynamics_figure(nominal)
+    % Shows how attitude and rates evolve during tracking
+    
+    fig = figure('Position', [100 100 1200 800]);
+    
+    t = nominal.t;
+    att = nominal.x(:,4:6);      % [roll, pitch, yaw]
+    omega = nominal.x(:,10:12);  % [p, q, r] angular rates
+    vel = nominal.x(:,7:9);      % [vx, vy, vz]
+    vel_mag = sqrt(sum(vel.^2, 2));
+    
+    % Subplot 1: Attitude angles
+    subplot(3,1,1);
+    plot(t, rad2deg(att(:,1)), 'r-', 'LineWidth', 1.5); hold on;
+    plot(t, rad2deg(att(:,2)), 'g-', 'LineWidth', 1.5);
+    plot(t, rad2deg(att(:,3)), 'b-', 'LineWidth', 1.5);
+    ylabel('Angle (deg)', 'FontSize', 10);
+    legend('Roll', 'Pitch', 'Yaw', 'Location', 'best', 'FontSize', 9);
+    title('Attitude and Rate Dynamics', 'FontSize', 12, 'FontWeight', 'bold');
+    grid on;
+    add_waypoint_markers(nominal, true, 1, 3);  % Labels on top subplot
+    
+    % Subplot 2: Angular rates
+    subplot(3,1,2);
+    plot(t, rad2deg(omega(:,1)), 'r-', 'LineWidth', 1.5); hold on;
+    plot(t, rad2deg(omega(:,2)), 'g-', 'LineWidth', 1.5);
+    plot(t, rad2deg(omega(:,3)), 'b-', 'LineWidth', 1.5);
+    ylabel('Angular Rate (deg/s)', 'FontSize', 10);
+    legend('p (roll rate)', 'q (pitch rate)', 'r (yaw rate)', 'Location', 'best', 'FontSize', 9);
+    grid on;
+    add_waypoint_markers(nominal, true, 2, 3);  % No labels
+    
+    % Subplot 3: Linear velocity
+    subplot(3,1,3);
+    plot(t, vel_mag, 'k-', 'LineWidth', 2); hold on;
+    plot(t, vel(:,1), 'r--', 'LineWidth', 1);
+    plot(t, vel(:,2), 'g--', 'LineWidth', 1);
+    plot(t, vel(:,3), 'b--', 'LineWidth', 1);
+    ylabel('Velocity (m/s)', 'FontSize', 10);
+    xlabel('Time (s)', 'FontSize', 10);
+    legend('|V| (magnitude)', 'V_x', 'V_y', 'V_z', 'Location', 'best', 'FontSize', 9);
+    grid on;
+    add_waypoint_markers(nominal, true, 3, 3);  % No labels
+end
+
+function add_waypoint_markers(nominal, show_labels, subplot_idx, total_subplots)
+    % ADD_WAYPOINT_MARKERS - Add vertical lines and labels for waypoints
+    %
+    % INPUTS:
+    %   nominal         - Nominal simulation results structure
+    %   show_labels     - (optional) Boolean to show waypoint labels (default: true)
+    %   subplot_idx     - (optional) Current subplot index (1-based)
+    %   total_subplots  - (optional) Total number of subplots in figure
+    %
+    % NOTES:
+    %   Labels only appear on the first (top) subplot to avoid duplication
+    %   Last waypoint label is skipped (overlaps with trajectory end marker)
+    
+    if nargin < 2
+        show_labels = true;
+    end
+    if nargin < 3
+        subplot_idx = 1;
+    end
+    if nargin < 4
+        total_subplots = 1;
+    end
+    
+    % Try to load waypoints
+    if ~isfield(nominal, 'config') || ~isfield(nominal.config, 'trajectory_file')
+        return;
+    end
+    
+    try
+        wpt = load_waypoints(nominal.config.trajectory_file);
+        waypoint_times = wpt.time;
+        if isfield(wpt, 'labels')
+            waypoint_labels = wpt.labels;
+        else
+            waypoint_labels = {};
+        end
+    catch
+        return;
+    end
+    
+    % Ensure waypoints are sorted (defensive check, should already be sorted)
+    [waypoint_times, sort_idx] = sort(waypoint_times);
+    if ~isempty(waypoint_labels)
+        waypoint_labels = waypoint_labels(sort_idx);
+    end
+    
+    % Get current axis limits
+    ylim_current = ylim;
+    
+    % Add vertical lines at each waypoint time
+    n_waypoints = length(waypoint_times);
+    for j = 1:n_waypoints
+        line([waypoint_times(j) waypoint_times(j)], ylim_current, ...
+             'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 1, ...
+             'HandleVisibility', 'off');
+        
+        % Add label ONLY on first subplot, and skip the last waypoint (overlaps with end)
+        if show_labels && subplot_idx == 1 && j < n_waypoints && ...
+           ~isempty(waypoint_labels) && j <= length(waypoint_labels)
+            if ~isempty(waypoint_labels{j})
+                text(waypoint_times(j), ylim_current(2), sprintf(' %s', waypoint_labels{j}), ...
+                     'VerticalAlignment', 'top', 'FontSize', 8, ...
+                     'Color', [0.3 0.3 0.3], 'FontWeight', 'bold');
+            end
+        end
+    end
+end
 
 function write_paper_metrics(nominal, mc, analysis, filename)
     % Write comprehensive metrics table for paper using pre-computed analysis
