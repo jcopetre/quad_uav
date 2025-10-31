@@ -43,6 +43,7 @@ function init_project(verbose)
         'dynamics';
         'test';
         'utilities';
+        'data'
     };
     
     %% Check which directories need to be added

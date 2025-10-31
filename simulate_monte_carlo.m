@@ -1,48 +1,128 @@
-clear, clc;
-init_project();
+% SIMULATE_MONTE_CARLO - Orchestrator for Monte Carlo robustness study
+%
+% High-level script that runs both nominal simulation and Monte Carlo analysis,
+% saving all results with a user-specified run label for easy identification.
+%
+% SYNTAX:
+%   simulate_monte_carlo(trajectory_file, run_label)
+%   simulate_monte_carlo(trajectory_file, run_label, perturb_config, mc_options)
+%
+% INPUTS:
+%   trajectory_file - Waypoint file in ./trajectories/ (e.g., 'simple_square.wpt')
+%   run_label       - String identifier for this run (e.g., 'full_run', 'baseline')
+%                     Used in output filenames and saved in results structure
+%   perturb_config  - (optional) Parameter perturbation configuration
+%   mc_options      - (optional) Monte Carlo options
+%
+% OUTPUTS:
+%   Saves to ./results/ with run_label in filename:
+%     - nominal_[run_label]_[timestamp].mat    (single simulation)
+%     - mc_[run_label]_[timestamp].mat         (Monte Carlo results)
+%     - metrics_[run_label]_[timestamp].txt    (human-readable metrics)
+%
+% EXAMPLE:
+%   % Run baseline configuration
+%   simulate_monte_carlo('simple_square.wpt', 'baseline');
+%
+%   % Run with custom perturbations
+%   perturb_config.params = {
+%       'm',   'normal', 0.5, 0.025;
+%       'Ixx', 'normal', 0.01, 0.0015;
+%   };
+%   mc_options.N_trials = 2000;
+%   simulate_monte_carlo('simple_square.wpt', 'full_run', perturb_config, mc_options);
 
-TRAJECTORY = 'simple_square.wpt';
-
-%% Get nominal parameters to compute absolute uncertainties
-params_nominal = quadrotor_linear_6dof();
-
-%% Operational Uncertainties
-perturb_config = struct();
-perturb_config.params = {
-    % Parameter, Type, Param1, Param2
-
-    % Mass: ±10% (payload changes, battery depletion)
-    'm', 'normal', params_nominal.m, params_nominal.m * 0.05;
+function simulate_monte_carlo(trajectory_file, run_label, perturb_config, mc_options)
     
-    % Inertia: ±15% (payload distribution, manufacturing)
-    'Ixx', 'normal', params_nominal.Ixx, params_nominal.Ixx * 0.075;
-    'Iyy', 'normal', params_nominal.Iyy, params_nominal.Iyy * 0.075;
-    'Izz', 'normal', params_nominal.Izz, params_nominal.Izz * 0.075;
+%% Input Handling
+    if nargin < 3 || isempty(perturb_config)
+        % Use default values
+        params = quadrotor_linear_6dof();
+        perturb_config.params = {
+            'm',   'normal', params.m,   params.m * 0.05;
+            'Ixx', 'normal', params.Ixx, params.Ixx * 0.075;
+            'Iyy', 'normal', params.Iyy, params.Iyy * 0.075;
+            'Izz', 'normal', params.Izz, params.Izz * 0.075;
+            'L',   'normal', params.L,   params.L * 0.005;
+        };
+    end
     
-    % TODO implement these in quadrotor_linear_6dof etc
-    % % Thrust coefficient: ±12% (propeller wear, voltage sag, temperature)
-    % 'k_thrust', 'normal', params_nominal.k_thrust, params_nominal.k_thrust * 0.06;
-    % 
-    % % Moment coefficient: ±12% (similar to thrust)
-    % 'k_torque', 'normal', params_nominal.k_torque, params_nominal.k_torque * 0.06;
+    if nargin < 4
+        mc_options = struct();
+    end
     
-    % Arm length: ±1% (manufacturing tolerance)
-    'L', 'normal', params_nominal.L, params_nominal.L * 0.005;
-};
-
-
-%% Monte Carlo Options
-mc_options = struct();
-mc_options.n_trials = 500;  % Good statistical power for pilot study
-mc_options.seed = 42;       % Reproducibility
-mc_options.parallel = true; % Set true if you have parallel computing available
-mc_options.verbose = true;  % Monitor progress
-
-timestamp = datestr(now, 'yyyymmdd_HHMMSS');
-mc_options.save_file = sprintf('./results/mc_pilot_study_%s.mat', timestamp);
-
-%% Run the study
-results = run_monte_carlo(TRAJECTORY, perturb_config, mc_options);
-
-%% Analyze results
-analysis = analyze_monte_carlo_results(results);
+    % Set defaults for mc_options
+    if ~isfield(mc_options, 'N_trials')
+        mc_options.N_trials = 500;
+    end
+    if ~isfield(mc_options, 'parallel')
+        mc_options.parallel = true;
+    end
+    if ~isfield(mc_options, 'verbose')
+        mc_options.verbose = false;
+    end
+    
+    %% Create Nested Results Directory
+    timestamp_str = datestr(now, 'yyyymmdd_HHMMSS');
+    run_dir_name = sprintf('%s_%s', run_label, timestamp_str);
+    results_dir = fullfile('.', 'results', run_dir_name);
+    
+    if ~exist(results_dir, 'dir')
+        mkdir(results_dir);
+    end
+    
+    %% Console Header
+    fprintf('\n=======================================================\n');
+    fprintf('MONTE CARLO STUDY: %s\n', run_label);
+    fprintf('=======================================================\n');
+    fprintf('Results directory: %s\n', results_dir);
+    fprintf('Timestamp: %s\n', timestamp_str);
+    fprintf('N_trials: %d\n', mc_options.N_trials);
+    fprintf('=======================================================\n\n');
+    
+    %% Step 1: Run Nominal Simulation
+    fprintf('[1/3] Running nominal simulation...\n');
+    
+    sim_options.verbose = mc_options.verbose;
+    sim_options.plot = false;           % No plots during batch processing
+    sim_options.save_results = false;   % Disable auto-save (we handle saving)
+    nominal_results = simulate_quadrotor_pure(trajectory_file, [], [], [], sim_options);
+    
+    % Save in nested directory with simple filename
+    nominal_file = fullfile(results_dir, 'nominal.mat');
+    save(nominal_file, '-struct', 'nominal_results');
+    fprintf('      Saved: %s\n\n', nominal_file);
+    
+    %% Step 2: Run Monte Carlo Analysis
+    fprintf('[2/3] Running Monte Carlo analysis...\n');
+    fprintf('      (N=%d trials, parallel=%d, verbose=%d)\n', ...
+            mc_options.N_trials, mc_options.parallel, mc_options.verbose);
+    
+    mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_options);
+    
+    % Save in nested directory with simple filename
+    mc_file = fullfile(results_dir, 'monte_carlo.mat');
+    save(mc_file, '-struct', 'mc_results');
+    fprintf('      Saved: %s\n\n', mc_file);
+    
+    %% Step 3: Write Metrics Report
+    fprintf('[3/3] Writing metrics report...\n');
+    
+    metrics_file = fullfile(results_dir, 'metrics.txt');
+    save_metrics_report(nominal_results, mc_results, metrics_file);
+    fprintf('      Saved: %s\n\n', metrics_file);
+    
+    %% Final Instructions
+    fprintf('=======================================================\n');
+    fprintf('✅ STUDY COMPLETE: %s\n', run_label);
+    fprintf('=======================================================\n');
+    fprintf('Directory: %s\n', results_dir);
+    fprintf('\nTo generate figures:\n');
+    fprintf('  >> generate_paper_figures(''%s'', ''%s'');\n', run_label, timestamp_str);
+    fprintf('  >> generate_paper_figures(''%s'', ''latest'');\n', run_label);
+    fprintf('\nResults saved:\n');
+    fprintf('  - %s\n', nominal_file);
+    fprintf('  - %s\n', mc_file);
+    fprintf('  - %s\n', metrics_file);
+    fprintf('=======================================================\n\n');
+end

@@ -559,19 +559,60 @@ function fig = plot_parameter_scatter(param_data, metrics_data)
     end
 end
 
+% function fig = plot_boxplots(metrics_data)
+%     % Box plots for robustness visualization
+% 
+%     fig = figure('Name', 'Robustness Analysis', 'Position', [100 100 1000 400]);
+% 
+%     data_matrix = [metrics_data.rmse_position, ...
+%                    rad2deg(metrics_data.rmse_attitude), ...
+%                    metrics_data.max_position_error];
+% 
+%     boxplot(data_matrix, 'Labels', {'Position RMSE (m)', 'Attitude RMSE (deg)', 'Max Error (m)'});
+%     ylabel('Value');
+%     title('Performance Metric Distributions');
+%     grid on;
+% end
+
 function fig = plot_boxplots(metrics_data)
-    % Box plots for robustness visualization
+    % Plot robustness box plots
     
-    fig = figure('Name', 'Robustness Analysis', 'Position', [100 100 1000 400]);
+    fig = figure('Name', 'MC Boxplots', 'Position', [100 100 1200 500]);
     
-    data_matrix = [metrics_data.rmse_position, ...
-                   rad2deg(metrics_data.rmse_attitude), ...
-                   metrics_data.max_position_error];
+    n_trials = length(metrics_data.rmse_position);
     
-    boxplot(data_matrix, 'Labels', {'Position RMSE (m)', 'Attitude RMSE (deg)', 'Max Error (m)'});
-    ylabel('Value');
-    title('Performance Metric Distributions');
+    % Position RMSE boxplot
+    subplot(1,3,1);
+    boxplot(metrics_data.rmse_position);
+    ylabel('Position RMSE (m)');
+    title('Position Tracking Error');
     grid on;
+    set(gca, 'XTickLabel', {''});  % Remove x-axis label
+    
+    % Attitude RMSE boxplot
+    subplot(1,3,2);
+    boxplot(rad2deg(metrics_data.rmse_attitude));
+    ylabel('Attitude RMSE (deg)');
+    title('Attitude Tracking Error');
+    grid on;
+    set(gca, 'XTickLabel', {''});
+    
+    % Control effort boxplot
+    subplot(1,3,3);
+    if isfield(metrics_data, 'control_effort')
+        boxplot(metrics_data.control_effort);
+        ylabel('Control Effort');
+        title('Control Effort Distribution');
+    else
+        text(0.5, 0.5, 'Control effort not available', ...
+             'HorizontalAlignment', 'center', 'FontSize', 12);
+        axis off;
+    end
+    grid on;
+    set(gca, 'XTickLabel', {''});
+    
+    sgtitle(sprintf('Monte Carlo Performance Distribution (N=%d successful trials)', n_trials), ...
+            'FontSize', 14, 'FontWeight', 'bold');
 end
 
 function fig = plot_correlation_heatmap(correlations, param_names)

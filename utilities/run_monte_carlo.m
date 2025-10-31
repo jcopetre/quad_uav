@@ -258,12 +258,20 @@ function mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_option
     
     %% Save results
     if ~isempty(mc_options.save_file)
-        save(mc_options.save_file, 'mc_results', '-v7.3');
-        if mc_options.verbose
-            fprintf('Results saved to: %s\n\n', mc_options.save_file);
+        % Use DataManager for validated save
+        [filepath_dir, filename_base, ~] = fileparts(mc_options.save_file);
+        if isempty(filepath_dir)
+            filepath_dir = './results';
+        end
+        
+        save_options = struct('verbose', mc_options.verbose, 'validate', true);
+        actual_filepath = DataManager.save_results(mc_results, filename_base, filepath_dir, save_options);
+        
+        if mc_options.verbose && ~strcmp(actual_filepath, mc_options.save_file)
+            fprintf('Note: File saved to: %s\n', actual_filepath);
         end
     elseif mc_options.verbose
-        fprintf('Use save(''filename.mat'', ''mc_results'') to save results.\n\n');
+        fprintf('Use DataManager.save_results(mc_results, ''label'', ''results'') to save.\n\n');
     end
     
 end

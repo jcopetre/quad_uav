@@ -414,7 +414,10 @@ function results = simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
         results_struct.sim_time = sim_time;
         
         % Save to file
-        save(filepath, '-struct', 'results_struct');
+        [~, traj_name, ~] = fileparts(trajectory_file);
+        label = sprintf('simulation_%s', traj_name);
+        save_options = struct('verbose', verbose, 'validate', true);
+        filepath = DataManager.save_results(results_struct, label, './results', save_options);
         
         if verbose
             fprintf('  Results saved to: %s\n', filepath);
