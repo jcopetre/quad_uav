@@ -25,7 +25,7 @@ init_project();
 TRAJECTORY_FILE = 'simple_square.wpt';
 
 % Choose run configuration
-RUN_TYPE = 'test';  % Options: 'test', 'pilot', 'full', 'custom'
+RUN_TYPE = 'full';  % Options: 'test', 'pilot', 'full', 'custom'
 
 fprintf('=================================================================\n');
 fprintf('PAPER WORKFLOW EXAMPLE\n');
@@ -46,11 +46,11 @@ switch lower(RUN_TYPE)
         % Quick test study - good for testing
         run_label = 'test';
         
-        % Use defaults (10 trials, nominal uncertainties)
+        % Use defaults (50 trials, nominal uncertainties)
         fprintf('Running test study with default settings...\n');
         
         mc_options = struct();
-        mc_options.N_trials = 50;     % Paper-quality statistics
+        mc_options.N_trials = 50;     
         mc_options.parallel = true;   % Use all CPU cores
         mc_options.verbose = false;
         fprintf('Running pilot study with default settings...\n');
@@ -175,8 +175,11 @@ fprintf('-----------------------------------------------------------------\n');
 fprintf('Generating all paper figures from saved data...\n');
 fprintf('This should take ~10-20 seconds (no simulation rerun!)\n\n');
 
+fig_options.close_figures = true;  % Close figures after saving for clean batch processing
+fig_options.verbose = true;
+
 % Generate figures from saved data
-generate_paper_figures(run_label, 'latest');
+generate_paper_figures(run_label, 'latest', fig_options);
 
 fprintf('\n');
 

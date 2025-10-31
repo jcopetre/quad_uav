@@ -1,15 +1,19 @@
-function generate_paper_figures(run_label, timestamp, output_dir)
+function generate_paper_figures(run_label, timestamp, output_dir, options)
     % GENERATE_PAPER_FIGURES Creates publication-quality figures from saved simulation data
     %
     % USAGE:
     %   generate_paper_figures(run_label, timestamp)
     %   generate_paper_figures(run_label, 'latest')
     %   generate_paper_figures(run_label, timestamp, output_dir)
+    %   generate_paper_figures(run_label, timestamp, output_dir, options)
     %
     % INPUTS:
     %   run_label   - Study identifier (e.g., 'paper_final')
     %   timestamp   - Specific timestamp or 'latest' to auto-find most recent
     %   output_dir  - [optional] Custom output directory (default: auto-matched nested dir)
+    %   options     - [optional] Struct with:
+    %                 .close_figures - Close figures after saving (default: true)
+    %                 .verbose       - Print progress messages (default: true)
     %
     % OUTPUTS:
     %   Creates nested directory: ./figures/<run_label>_<timestamp>/
@@ -26,15 +30,39 @@ function generate_paper_figures(run_label, timestamp, output_dir)
     %   % After running simulate_monte_carlo('simple_square.wpt', 'paper_final');
     %   generate_paper_figures('paper_final', 'latest');
     
-    %% Input Handling
+%% Input Handling
     if nargin < 2
         timestamp = 'latest';
     end
     
-    % Find latest timestamp if requested
+    % Smart argument detection for 3rd and 4th arguments
+    if nargin == 3
+        % Check if 3rd argument is a struct (options) or string/char (output_dir)
+        if isstruct(output_dir)
+            % User passed options as 3rd argument
+            options = output_dir;
+            output_dir = [];  % Use default
+        else
+            % User passed output_dir as 3rd argument
+            options = struct();
+        end
+    elseif nargin < 3
+        output_dir = [];
+        options = struct();
+    elseif nargin < 4
+        options = struct();
+    end
+    
+    % Set default options
+    if ~isfield(options, 'close_figures'), options.close_figures = true; end
+    if ~isfield(options, 'verbose'), options.verbose = true; end
+    
+    % Find latest timestamp if requested (MUST happen before building paths)
     if strcmpi(timestamp, 'latest')
         timestamp = find_latest_timestamp(run_label);
-        fprintf('Auto-detected latest run: %s\n', timestamp);
+        if options.verbose
+            fprintf('Auto-detected latest run: %s\n', timestamp);
+        end
     end
     
     % Build paths to data directory
@@ -43,7 +71,8 @@ function generate_paper_figures(run_label, timestamp, output_dir)
     
     % Verify directory exists
     if ~exist(results_dir, 'dir')
-        error('Results directory not found: %s', results_dir);
+        error('Results directory not found: %s\nAvailable directories:\n%s', ...
+              results_dir, list_available_runs(run_label));
     end
     
     % Create matching figures directory
@@ -84,17 +113,23 @@ function generate_paper_figures(run_label, timestamp, output_dir)
     fprintf('[3/7] Creating 3D tracking visualization...\n');
     fig1 = create_3d_tracking_figure(nominal);
     saveas(fig1, fullfile(figures_dir, 'square_tracking_3d.png'));
-    close(fig1);
+    if options.close_figures
+        close(fig1);
+    end
     
     fprintf('[4/7] Creating tracking timeseries...\n');
     fig2 = create_tracking_timeseries(nominal);
     saveas(fig2, fullfile(figures_dir, 'tracking_timeseries.png'));
-    close(fig2);
+    if options.close_figures
+        close(fig2);
+    end
     
     fprintf('[5/7] Creating control inputs plot...\n');
     fig3 = create_control_inputs_figure(nominal);
     saveas(fig3, fullfile(figures_dir, 'control_inputs.png'));
-    close(fig3);
+    if options.close_figures
+        close(fig3);
+    end
     
     % fprintf('[6/7] Creating Monte Carlo boxplots...\n');
     % fig4 = create_mc_boxplots(mc);
@@ -114,7 +149,8 @@ function generate_paper_figures(run_label, timestamp, output_dir)
     analysis_options.plot = true;
     analysis_options.save_plots = true;
     analysis_options.plot_dir = figures_dir;
-    analysis_options.verbose = false;  
+    analysis_options.verbose = false;
+    analysis_options.close_figures = options.close_figures;
     
     analysis = analyze_monte_carlo_results(mc, analysis_options);
     
@@ -203,14 +239,86 @@ function fig = create_3d_tracking_figure(nominal)
     plot3(pos(:,1), pos(:,2), pos(:,3), 'b-', 'LineWidth', 2); hold on;
     plot3(pos_ref(:,1), pos_ref(:,2), pos_ref(:,3), 'r--', 'LineWidth', 1.5);
     
-    % Mark start and end
-    plot3(pos(1,1), pos(1,2), pos(1,3), 'go', 'MarkerSize', 10, 'MarkerFaceColor', 'g');
-    plot3(pos(end,1), pos(end,2), pos(end,3), 'rs', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
+    % Add waypoints if available
+    show_waypoints = false;
+    if isfield(nominal, 'config') && isfield(nominal.config, 'trajectory_file')
+        try
+            % Load original waypoint file
+            wpt = load_waypoints(nominal.config.trajectory_file);
+            
+            % Plot waypoint markers
+            plot3(wpt.position(:,1), wpt.position(:,2), wpt.position(:,3), ...
+                  'ko', 'MarkerSize', 8, 'MarkerFaceColor', 'y', 'LineWidth', 1.5);
+            
+            % Add labels with smart positioning
+            if isfield(wpt, 'labels')
+                n_wpt = length(wpt.time);
+                
+                % Check if start and end are at same location (closed loop)
+                start_end_same = norm(wpt.position(1,:) - wpt.position(end,:)) < 0.01;
+                
+                for i = 1:n_wpt
+                    if ~isempty(wpt.labels{i})
+                        % Calculate offset direction (radial outward from trajectory center)
+                        traj_center = mean(wpt.position, 1);
+                        offset_dir = wpt.position(i,:) - traj_center;
+                        offset_dir = offset_dir / (norm(offset_dir) + eps);  % Normalize
+                        
+                        % Scale offset based on trajectory size
+                        traj_size = max(range(wpt.position));
+                        offset_scale = traj_size * 0.08;  % 8% of trajectory range
+                        
+                        % Apply offset
+                        label_pos = wpt.position(i,:) + offset_dir * offset_scale;
+                        
+                        % Special handling for start/end if they overlap
+                        if start_end_same
+                            if i == 1
+                                % Start label - offset upward
+                                label_pos(3) = label_pos(3) + offset_scale * 0.5;
+                                label_text = sprintf('%s (start)', wpt.labels{i});
+                            elseif i == n_wpt
+                                % End label - offset downward
+                                label_pos(3) = label_pos(3) - offset_scale * 0.5;
+                                label_text = sprintf('%s (end)', wpt.labels{i});
+                            else
+                                label_text = wpt.labels{i};
+                            end
+                        else
+                            label_text = wpt.labels{i};
+                        end
+                        
+                        text(label_pos(1), label_pos(2), label_pos(3), label_text, ...
+                             'FontSize', 9, 'FontWeight', 'bold', ...
+                             'HorizontalAlignment', 'center');
+                    end
+                end
+            end
+            
+            show_waypoints = true;
+        catch ME
+            % If waypoint loading fails, skip waypoint markers
+            warning('Could not load waypoints: %s', ME.message);
+        end
+    end
     
-    xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
-    legend('Actual', 'Reference', 'Start', 'End', 'Location', 'best');
-    title('Square Trajectory Tracking (3D View)');
-    grid on; axis equal;
+    % Mark start and end
+    plot3(pos(1,1), pos(1,2), pos(1,3), 'go', 'MarkerSize', 12, 'MarkerFaceColor', 'g', 'LineWidth', 2);
+    plot3(pos(end,1), pos(end,2), pos(end,3), 'rs', 'MarkerSize', 12, 'MarkerFaceColor', 'r', 'LineWidth', 2);
+    
+    xlabel('X (m)', 'FontSize', 11); 
+    ylabel('Y (m)', 'FontSize', 11); 
+    zlabel('Z (m)', 'FontSize', 11);
+    
+    if show_waypoints
+        legend('Actual', 'Reference', 'Waypoints', 'Start', 'End', 'Location', 'best');
+    else
+        legend('Actual', 'Reference', 'Start', 'End', 'Location', 'best');
+    end
+    
+    title('Square Trajectory Tracking (3D View)', 'FontSize', 12, 'FontWeight', 'bold');
+    grid on; 
+    axis equal;
     view(45, 30);
 end
 
@@ -226,15 +334,51 @@ function fig = create_tracking_timeseries(nominal)
     traj = nominal.trajectory;
     pos_ref = interp1(traj.time, traj.position, t, 'linear', 'extrap');
     
+    % Load waypoints if available
+    waypoint_times = [];
+    waypoint_labels = {};
+    if isfield(nominal, 'config') && isfield(nominal.config, 'trajectory_file')
+        try
+            wpt = load_waypoints(nominal.config.trajectory_file);
+            waypoint_times = wpt.time;
+            if isfield(wpt, 'labels')
+                waypoint_labels = wpt.labels;
+            end
+        catch
+            % Skip waypoints if loading fails
+        end
+    end
+    
     labels = {'X', 'Y', 'Z'};
     for i = 1:3
         subplot(3,1,i);
         plot(t, pos_ref(:,i), 'r--', 'LineWidth', 1.5); hold on;
         plot(t, pos(:,i), 'b-', 'LineWidth', 1);
+        
+        % Add vertical lines at waypoint times
+        if ~isempty(waypoint_times)
+            y_limits = ylim;
+            for j = 1:length(waypoint_times)
+                line([waypoint_times(j) waypoint_times(j)], y_limits, ...
+                     'Color', [0.5 0.5 0.5], 'LineStyle', ':', 'LineWidth', 1);
+                
+                % Add waypoint label at top of plot
+                if ~isempty(waypoint_labels) && j <= length(waypoint_labels)
+                    text(waypoint_times(j), y_limits(2), sprintf(' %s', waypoint_labels{j}), ...
+                         'VerticalAlignment', 'top', 'FontSize', 7, 'Color', [0.4 0.4 0.4]);
+                end
+            end
+        end
+        
         ylabel(sprintf('%s (m)', labels{i}));
         grid on;
-        legend('Reference', 'Actual', 'Location', 'best');
+        
         if i == 1
+            if ~isempty(waypoint_times)
+                legend('Reference', 'Actual', 'Waypoint', 'Location', 'best');
+            else
+                legend('Reference', 'Actual', 'Location', 'best');
+            end
             title('Position Tracking vs Time');
         end
     end
@@ -792,4 +936,21 @@ function cmap = redblue()
     g = [(0:n-1)'/n; flipud((0:n-1)'/n)];
     b = [ones(n,1); flipud((0:n-1)'/n)];
     cmap = [r g b];
+end
+
+function listing = list_available_runs(run_label)
+    % List available run directories for debugging
+    pattern = fullfile('.', 'results', sprintf('%s_*', run_label));
+    dirs = dir(pattern);
+    
+    if isempty(dirs)
+        listing = sprintf('  (No results found for "%s")', run_label);
+    else
+        listing = '';
+        for i = 1:length(dirs)
+            if dirs(i).isdir
+                listing = [listing sprintf('  - %s\n', dirs(i).name)]; %#ok<AGROW>
+            end
+        end
+    end
 end

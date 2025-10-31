@@ -66,7 +66,8 @@ function analysis = analyze_monte_carlo_results(mc_results, analysis_options)
     if ~isfield(analysis_options, 'sensitivity'), analysis_options.sensitivity = true; end
     if ~isfield(analysis_options, 'percentiles'), analysis_options.percentiles = [5 25 50 75 95]; end
     if ~isfield(analysis_options, 'verbose'),     analysis_options.verbose = true; end
-    
+    if ~isfield(analysis_options, 'close_figures'), analysis_options.close_figures = false; end
+
     %% Header
     if analysis_options.verbose
         fprintf('\n===================================\n');
@@ -193,6 +194,11 @@ function analysis = analyze_monte_carlo_results(mc_results, analysis_options)
         % Save plots if requested
         if analysis_options.save_plots
             save_figures(figures, analysis_options.plot_dir);
+        end
+        
+        % Close figures if requested
+        if analysis_options.close_figures
+            close_figures_from_struct(figures);
         end
     end
     
@@ -718,5 +724,15 @@ function save_figures(figures, plot_dir)
         filename = fullfile(plot_dir, [field_names{i} '.png']);
         saveas(fig, filename);
         fprintf('  Saved: %s\n', filename);
+    end
+end
+
+function close_figures_from_struct(figures)
+    % Close all figures in a structure
+    field_names = fieldnames(figures);
+    for i = 1:length(field_names)
+        if ishandle(figures.(field_names{i}))
+            close(figures.(field_names{i}));
+        end
     end
 end
