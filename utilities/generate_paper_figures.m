@@ -18,7 +18,7 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     % OUTPUTS:
     %   Creates nested directory: ./figures/<run_label>_<timestamp>/
     %   Saves six figures in that directory:
-    %     - square_tracking_3d.png
+    %     - tracking_3d.png
     %     - tracking_timeseries.png
     %     - control_inputs.png
     %     - mc_boxplots.png
@@ -112,7 +112,7 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     %% Generate Figures
     fprintf('[3] Creating 3D tracking visualization...\n');
     fig1 = create_3d_tracking_figure(nominal);
-    saveas(fig1, fullfile(figures_dir, 'square_tracking_3d.png'));
+    saveas(fig1, fullfile(figures_dir, 'tracking_3d.png'));
     if options.close_figures
         close(fig1);
     end
@@ -170,7 +170,7 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     fprintf('=======================================================\n');
     fprintf('Output directory: %s\n', figures_dir);
     fprintf('\nFiles created:\n');
-    fprintf('  - square_tracking_3d.png\n');
+    fprintf('  - tracking_3d.png\n');
     fprintf('  - tracking_timeseries.png\n');
     fprintf('  - control_inputs.png\n');
     fprintf('  - attitude_dynamics.png\n');
