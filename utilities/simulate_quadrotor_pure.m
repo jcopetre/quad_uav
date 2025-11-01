@@ -18,12 +18,13 @@ function results = simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
 %   x0              - (optional) Initial state (12x1), default zeros
 %                     NOTE: Position (1:3) will be overridden by waypoint start
 %   options         - (optional) Struct with fields:
-%                     .verbose      - Print progress (default: true)
-%                     .save_results - Save to ./results/ (default: true)
-%                     .plot         - Generate plots (default: true if no output)
-%                     .dt           - Trajectory time step (default: 0.01)
+%                     ...
 %                     .params       - Pre-designed params (overrides Q, R)
-%                                     Use for Monte Carlo with fixed controller
+%                                     When provided, uses these physical parameters
+%                                     with the included controller gains (K, u_hover).
+%                                     Primary use case: Monte Carlo simulations where
+%                                     you want to test perturbed plant dynamics against
+%                                     a nominal (fixed) controller design.
 %
 % OUTPUTS:
 %   results - (optional) Structure containing simulation data:
