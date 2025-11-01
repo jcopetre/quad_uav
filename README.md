@@ -1,667 +1,205 @@
-# Quadrotor 6DOF LQR Control - Pure MATLAB Implementation
+# Quadrotor 6DOF LQR Control Framework
 
-A complete simulation framework for trajectory tracking control of a 6 degree-of-freedom quadrotor UAV using Linear Quadratic Regulator (LQR) control with multiple trajectory generation methods.
-
-## 📁 Project Structure
-
-```
-<root>/
-│
-├── README.md                            [This file]
-├── Constants.m                          [Shared constants]
-├── init_project.m                       [Path initialization script]
-│
-├── examples/                            [Example usage scripts]
-│   ├── paper_results.m                  [Complete paper workflow]
-│   └── basic_simulation.m               [Simple simulation examples]
-│
-├── vehicle/
-│   └── quadrotor_linear_6dof.m          [Vehicle model, parameters, LQR design]
-│
-├── trajectories/
-│   ├── load_waypoints.m                 [Waypoint file loader (JSON)]
-│   ├── generate_trajectory_auto.m       [Automatic method selection (RECOMMENDED)]
-│   ├── generate_trajectory_interp.m     [MAKIMA interpolation-based generation]
-│   ├── generate_trajectory_minsnap.m    [Minimum snap optimization]
-│   └── *.wpt                            [Waypoint definition files (JSON)]
-│
-├── control/
-│   ├── compute_lqr_control.m            [LQR control law implementation]
-│   ├── get_reference_state.m            [Reference state lookup]
-│   └── quadrotor_closed_loop_dynamics.m [Closed-loop system for ODE solver]
-│
-├── dynamics/
-│   └── quadrotor_dynamics_pure.m        [Nonlinear 6DOF dynamics]
-│
-├── utilities/
-│   ├── simulate_quadrotor_pure.m        [Single simulation orchestrator]
-│   ├── simulate_monte_carlo.m           [Monte Carlo study orchestrator]
-│   ├── run_monte_carlo.m                [Parallel Monte Carlo trial execution]
-│   ├── analyze_monte_carlo_results.m    [Monte Carlo results analysis and visualization]
-│   ├── simulate_quadrotor.m             [ODE simulation with control logging]
-│   ├── compute_performance_metrics.m    [Standardized performance evaluation]
-│   ├── traj_feasibility_check.m         [Trajectory validation utilities]
-│   ├── DataManager.m                    [Data I/O with validation]
-│   └── generate_paper_figures.m         [Paper figure generation]
-│
-├── test/
-│   ├── setup_test_environment.m         [Test environment configuration]
-│   ├── run_tests.m                      [Automated test runner]
-│   ├── test_*.m                         [Unit test suites]
-│   ├── inttest_*.m                      [Integration tests]
-│   └── quick_*.m                        [Quick validation scripts]
-│
-└── results/
-    └── simulation_*.mat                 [Saved simulation outputs]
-```
-
-## 🔄 Data Flow Architecture
-
-### High-Level Flow
-
-```
-utilities/simulate_quadrotor_pure.m (Main Orchestrator)
-    │
-    ├──> quadrotor_linear_6dof() → LQR controller design
-    │
-    ├──> load_waypoints() → Parse .wpt file
-    │    └──> generate_trajectory_auto() → Auto-select generation method
-    │         ├──> generate_trajectory_interp() (if segments < 3s)
-    │         └──> generate_trajectory_minsnap() (if segments ≥ 3s)
-    │
-    └──> simulate_quadrotor() → Run ODE45
-         │
-         └──> (Each time step)
-              ├──> get_reference_state() → x_ref(t)
-              ├──> compute_lqr_control() → u = u₀ - K(x - x_ref)
-              └──> quadrotor_dynamics_pure() → ẋ = f(x,u)
-```
-
-Monte Carlo simulations are handled by:
-```
-utilities/simulate_monte_carlo.m → Orchestrates study with organized file outputs
-    ├──> utilities/simulate_quadrotor_pure.m → Nominal simulation
-    └──> utilities/run_monte_carlo.m → Executes trials in parallel with parfor
-         └──> utilities/analyze_monte_carlo_results.m → Computes statistics and generates plots
-```
-
-For detailed component flow diagrams, see the comprehensive architecture documentation in the extended README sections.
-
-## 🎯 State and Control Definitions
-
-### State Vector
-
-```
-x = [x, y, z, φ, θ, ψ, ẋ, ẏ, ż, p, q, r]ᵀ (12 states)
-```
-
-Where:
-* **Position**: x, y, z [m]
-* **Attitude**: φ, θ, ψ [rad] (roll, pitch, yaw)
-* **Linear Velocity**: ẋ, ẏ, ż [m/s]
-* **Angular Rate**: p, q, r [rad/s]
-
-### Control Vector
-
-```
-u = [F, τ_φ, τ_θ, τ_ψ]ᵀ (4 inputs)
-```
-
-Where:
-* **Thrust**: F [N]
-* **Torques**: τ_φ, τ_θ, τ_ψ [N·m]
-
-### Coordinate Frame
-
-**NED (North-East-Down)**:
-* **+X** : North (forward)
-* **+Y** : East (right)
-* **+Z** : Down (toward ground)
-* **Gravity** : Acts in +Z direction (downward)
-* **Thrust** : Acts in -Z direction (upward, opposes +Z)
-
-This is the standard aerospace convention used throughout the simulation.
+A complete MATLAB simulation framework for trajectory tracking control of quadrotor UAVs using Linear Quadratic Regulator (LQR) control. Features intelligent trajectory generation, comprehensive Monte Carlo robustness analysis, and publication-quality output generation.
 
 ## 🚀 Quick Start
 
 ### 1. Initialize Environment
 
-Before running any simulations, initialize the MATLAB path:
-
 ```matlab
-init_project
+init_project  % Run once per MATLAB session
 ```
 
-This adds all necessary directories to your MATLAB path. Run once per session or use `savepath` for permanence.
-
-### 2. Run Example Simulations
+### 2. Run Your First Simulation
 
 ```matlab
-% Navigate to examples directory
 cd examples
-
-% Run basic examples
-basic_simulation
-
-% Run complete paper workflow
-paper_results
+basic_simulation  % Simple demonstrations
 ```
 
-### 3. Direct Function Calls
+### 3. Try a Trajectory
 
 ```matlab
+simulate_trajectory('basic_maneuver.wpt')
+```
+
+**That's it!** You just ran a full 6DOF quadrotor simulation with LQR control.
+
+## 📚 Documentation
+
+**New users:** Start with the [Quick Start Guide](./doc/quick_start.md)
+
+**Complete documentation:**
+- [Installation Guide](./doc/installation.md) - Requirements and setup
+- [Quick Start Tutorial](./doc/quick_start.md) - Your first simulation in 5 minutes
+- [Architecture Overview](./doc/architecture.md) - System design and data flow
+- [API Reference](./doc/api_reference.md) - Complete function documentation
+- [Monte Carlo Guide](./doc/monte_carlo_guide.md) - Robustness analysis workflow
+
+## 📁 Project Structure
+
+```
+<root>/
+├── src/                     # Core framework code
+│   ├── simulation/          # Single trajectory simulation
+│   ├── monte_carlo/         # Robustness analysis
+│   ├── trajectory/          # Trajectory generation
+│   ├── output/              # Figure and report generation
+│   ├── data/                # Data management and validation
+│   └── utils/               # Utility functions
+├── vehicle/                 # Vehicle models and parameters
+├── control/                 # Control law implementations
+├── dynamics/                # Nonlinear dynamics models
+├── trajectories/            # Waypoint files (*.wpt)
+├── examples/                # Example scripts
+├── test/                    # Comprehensive test suite
+└── doc/                     # Documentation
+```
+
+## ✨ Key Features
+
+- **Intelligent Trajectory Generation**: Automatic method selection (MAKIMA interpolation vs. minimum snap optimization) based on waypoint timing
+- **Robust LQR Control**: Linearized control with comprehensive feasibility checking
+- **Monte Carlo Analysis**: Parallel parameter perturbation studies with statistical analysis
+- **Data Validation**: Strict data contracts ensure simulation integrity
+- **Publication Ready**: Automated figure generation with LaTeX metrics
+- **Pure MATLAB**: No Simulink required, minimal toolbox dependencies
+
+## 🎯 Quick Command Reference
+```matlab
+% Initialize
+init_project
+
 % Single simulation
-simulate_quadrotor_pure('basic_maneuver.wpt');
+simulate_trajectory('basic_maneuver.wpt')
 
-% Custom LQR tuning
+% Custom tuning
 Q = diag([200 200 200 20 20 5 20 20 20 2 2 1]);
-R = diag([0.01 0.5 0.5 0.5]);
-simulate_quadrotor_pure('basic_maneuver.wpt', Q, R);
+simulate_trajectory('basic_maneuver.wpt', Q)
 
-% Monte Carlo study with organized outputs
-simulate_monte_carlo('basic_maneuver.wpt', 'my_study', perturb_config, mc_options);
-```
+% Monte Carlo
+cd examples
+robustness_study
 
-## 📊 Example Output
-
-Running a simulation produces:
-
-```
-================================================================
-Quadrotor 6DOF LQR Control System
-Pure MATLAB Implementation
-================================================================
-Step 1/6: Loading quadrotor model and designing controller...
-Step 2/6: Loading trajectory...
-Step 3/6: Preparing trajectory from waypoints...
-Step 4/6: Setting up initial conditions...
-Step 5/6: Running ODE simulation...
-Step 6/6: Computing performance metrics...
-================================================================
-PERFORMANCE SUMMARY
-================================================================
-Position Tracking:
-  RMSE:             0.0234 m
-  Max error:        0.0456 m
-  Time in bounds:   95.2% (within 10cm)
-
-Attitude:
-  RMSE:             1.23 deg
-  Max roll:         5.67 deg
-  Max pitch:        6.12 deg
-
-Control Effort:
-  Total effort:     145.67
-  Mean thrust:      4.91 N (hover: 4.91 N)
-  Thrust sat.:      0.0% of time
-  Torque sat.:      0.0% of time
-
-Success Criteria:
-  Completed:        YES
-  Tracking OK:      YES (RMSE < 0.5m)
-  Attitude safe:    YES (angles < 60deg)
-  Overall:          YES
-
-Summary Score: 0.386 (lower is better)
-================================================================
-```
-
-## 🧪 Testing
-
-The project includes comprehensive unit and integration tests, automatically discovered and executable individually or as a suite.
-
-### Run All Tests
-
-```matlab
+% Run tests
 cd test
 run_tests
 ```
 
-### Individual Tests
+## 🎯 Example Output
 
-```matlab
-test_linear_6dof                % Vehicle model tests
-test_dynamics_pure              % Nonlinear dynamics tests
-test_control_loop               % Control loop tests
-test_waypoints                  % Waypoint loader tests
-test_trajectory_auto            % Automatic selector tests
-test_trajectory_interp          % MAKIMA interpolation trajectory tests
-test_trajectory_minsnap         % Minimum snap trajectory tests
-inttest_trajectory_closedloop   % Compare trajectory methods with LQR
-inttest_minsnap_visualization   % Visual validation of minimum snap
-quick_test_sim                  % Fast end-to-end test
-find_angle_limit                % Empirical controller limit analysis
+A typical simulation produces:
+
+```
+Position Tracking:
+  RMSE:             0.0234 m
+  Max error:        0.0456 m
+
+Attitude:
+  RMSE:             1.23 deg
+  Max roll:         5.67 deg
+
+Control Effort:
+  Thrust sat.:      0.0% of time
+  
+Success:            ✓ YES
 ```
 
-**Test Coverage**: 61+ unit tests across all core functionality. See individual test files for detailed descriptions.
-
-## 📊 Trajectory Generation Methods
-
-### Recommended: Automatic Method Selection
-
-**Use `generate_trajectory_auto.m` for most applications** - it intelligently selects the best trajectory generation method based on waypoint timing:
+## 🧪 Testing
 
 ```matlab
-% Automatic selection (recommended)
-wpt = load_waypoints('basic_maneuver.wpt');
-params = quadrotor_linear_6dof();
-trajectory = generate_trajectory_auto(wpt, params);
-fprintf('Selected method: %s\n', trajectory.method);
-```
-
-**Selection Logic** (based on empirical testing):
-- **Short segments (< 3s)**: Uses MAKIMA interpolation (avoids excessive accelerations)
-- **Long segments (≥ 3s)**: Uses minimum snap optimization (achieves optimal smoothness)
-
-The automatic selector analyzes all segment durations and conservatively selects interpolation if ANY segment is too short, preventing the generation of unsafe trajectories with excessive pitch angles (>15°).
-
-**Why this matters**: Minimum snap doesn't directly constrain acceleration. For 0.5s segments, it can generate 30 m/s² accelerations requiring 30° pitch - far exceeding the linearization validity region!
-
----
-
-### Advanced: Manual Method Selection
-
-For specialized use cases, you can explicitly choose a method:
-
-#### Method 1: MAKIMA Interpolation (`generate_trajectory_interp.m`)
-
-**Best for**: Real-time applications, rapid prototyping, short time segments
-
-**Characteristics**:
-* Fast generation (< 0.1s for typical trajectories)
-* C¹ continuity (smooth velocity)
-* Non-zero velocities at waypoints (natural motion)
-* Reduced oscillations vs. spline methods
-* Robust to unequally-spaced waypoints
-* **Safe for short segments** (doesn't produce excessive accelerations)
-
-**When to manually select**:
-* Real-time trajectory planning with tight timing
-* Rapid iteration during development
-* When you know segments are short (< 3s)
-
-```matlab
-% Force interpolation method
-trajectory = generate_trajectory_interp(wpt, params, 0.01);
-```
-
-#### Method 2: Minimum Snap Optimization (`generate_trajectory_minsnap.m`)
-
-**Best for**: Offline planning, aggressive maneuvers, optimal performance
-
-**Characteristics**:
-* Minimizes snap (4th derivative of position)
-* C⁴ continuity (very smooth)
-* Optimal for aggressive flight (reduces jerk in controls)
-* Slower generation (0.5-2s depending on waypoint count)
-* Follows Mellinger & Kumar (2011) formulation
-* Requires Optimization Toolbox for `quadprog`
-
-**When to manually select**:
-* Offline trajectory optimization with long segments (≥ 3s)
-* Aggressive racing or aerobatic maneuvers
-* When control smoothness is critical
-* When optimality matters more than computation time
-
-```matlab
-% Force minimum snap method
-trajectory = generate_trajectory_minsnap(wpt, params, 0.01);
-```
-
-#### Comparison
-
-```matlab
-% Compare both methods
-wpt = load_waypoints('basic_maneuver.wpt');
-params = quadrotor_linear_6dof();
-
-traj_auto = generate_trajectory_auto(wpt, params, 0.01);     % Recommended
-traj_interp = generate_trajectory_interp(wpt, params, 0.01); % Force method
-traj_minsnap = generate_trajectory_minsnap(wpt, params, 0.01); % Force method
-
-% Run integration test for detailed comparison
 cd test
-inttest_trajectory_closedloop
+run_tests  % Runs 61+ unit and integration tests
 ```
 
-See `test/inttest_trajectory_closedloop.m` for detailed performance comparison metrics and `test/test_trajectory_auto.m` for automatic selector validation.
-
-## 🛠️ Customization
-
-### Define Trajectories
-
-#### Method 1: Waypoint Files (Recommended)
-
-Create a `.wpt` file (JSON format) in `./trajectories/`:
-
-```json
-{
-  "metadata": {
-    "name": "Basic Test Flight",
-    "description": "Takeoff, maneuver, and land",
-    "created": "2025-01-09",
-    "vehicle": "quadrotor_500g"
-  },
-  "waypoints": [
-    {"label": "start", "time": 0, "x": 0, "y": 0, "z": 0, "yaw": 0},
-    {"label": "climb", "time": 2, "x": 0, "y": 0, "z": 1, "yaw": null},
-    {"label": "forward", "time": 5, "x": 2, "y": 0, "z": 1, "yaw": null},
-    {"label": "land", "time": 8, "x": 0, "y": 0, "z": 0, "yaw": 0}
-  ]
-}
-```
-
-Load in simulation:
+## 🔬 Monte Carlo Robustness Analysis
 
 ```matlab
-simulate_quadrotor_pure('my_trajectory.wpt');
-```
-
-**Yaw Behavior**:
-* Explicit value (e.g., `1.57`): UAV orients to specified heading
-* `null` (in JSON): Auto-calculate from velocity direction
-* Useful for camera pointing, inspection tasks, or wind compensation
-
-**Benefits of .wpt Files**:
-* Version control trajectory designs separately
-* Self-documenting with metadata
-* Easy batch processing for Monte Carlo analysis
-* Non-programmers can define flight paths
-* Reusable across experiments
-
-#### Method 2: Matrix Format (Programmatic)
-
-```matlab
-% Matrix format: [time, x, y, z, yaw]
-waypoints = [
-    0,  0, 0, 0,  0;
-    3,  2, 0, 1, NaN;  % NaN for auto yaw
-    10, 0, 0, 0,  0;
-];
-
-trajectory = generate_trajectory_interp(waypoints, params);
-```
-
-### Tune LQR Controller
-
-```matlab
-% Define custom weights
-Q = diag([200 200 200 20 20 2 20 20 20 2 2 0.2]);
-R = diag([0.5 2 2 2]);
-
-simulate_quadrotor_pure('my_trajectory.wpt', Q, R);
-```
-
-#### Weight Matrices
-
-**Q Matrix (State Penalty)** - 12×12 diagonal
-
-```
-Q = diag([qx qy qz qφ qθ qψ qvx qvy qvz qp qq qr])
-```
-
-* Higher Q values → Tighter tracking, more aggressive corrections
-* Lower Q values → Looser tracking, gentler response
-
-**R Matrix (Control Penalty)** - 4×4 diagonal
-
-```
-R = diag([rF rτφ rτθ rτψ])
-```
-
-* Higher R values → Smaller control inputs, smoother but slower
-* Lower R values → Larger control inputs, faster but more aggressive
-
-#### Practical Tuning Guidelines
-
-| Desired Behavior | Modification | Trade-off |
-|-----------------|--------------|-----------|
-| Tighter position tracking | Increase position Q | More control effort |
-| Smoother flight | Increase R | Slower tracking |
-| Faster response | Decrease R | Risk of oscillation |
-| Reduce oscillations | Increase velocity Q | Less aggressive |
-
-#### Example Configurations
-
-```matlab
-% Aggressive tracking (racing)
-Q_aggressive = diag([200 200 200 20 20 5 20 20 20 2 2 1]);
-R_aggressive = diag([0.01 0.5 0.5 0.5]);
-
-% Smooth operation (aerial photography)
-Q_smooth = diag([50 50 100 5 5 2 5 5 10 0.5 0.5 0.1]);
-R_smooth = diag([1 5 5 5]);
-
-% Energy efficient (long flight time)
-Q_efficient = diag([80 80 100 8 8 1 8 8 10 1 1 0.2]);
-R_efficient = diag([5 2 2 2]);
-```
-
-### Modify Vehicle Parameters
-
-Edit `./vehicle/quadrotor_linear_6dof.m`:
-
-```matlab
-params.m = 1.0;       % Mass (kg)
-params.L = 0.30;      % Arm length (m)
-params.Ixx = 0.01;    % Inertia (kg·m²)
-```
-
-## ⚙️ LQR Control Theory
-
-Linear Quadratic Regulator (LQR) finds optimal feedback gains by minimizing:
-
-```
-J = ∫ (xᵀQx + uᵀRu) dt
-```
-
-### How It Works
-
-1. **Algebraic Riccati Equation**: MATLAB's `lqr()` solves:
-   ```
-   AᵀS + SA - SBR⁻¹BᵀS + Q = 0
-   ```
-2. **Optimal Gain**:
-   ```
-   K = R⁻¹BᵀS
-   ```
-3. **Control Law**:
-   ```
-   u = u_hover - K(x - x_ref)
-   ```
-
-**Key Properties**:
-* Guaranteed stability (all closed-loop poles in left half-plane)
-* Optimal for linear systems
-* Intuitive tuning via Q and R matrices
-* Robust margins (60°/6dB gain/phase)
-
-**Why It Works for Quadrotors**:
-* System linearized around hover
-* Small deviations → linear approximation accurate
-* LQR provides inherent robustness
-* Quadrotor dynamics "mildly nonlinear" near hover
-
-**Limitations**:
-* Performance degrades far from linearization point
-* No guarantees for large angles or aggressive flight
-* Valid operating region: typically < 15° roll/pitch
-
-See `test/find_angle_limit.m` for empirical controller limit analysis.
-
-### Linearization Validity
-
-The LQR controller uses small-angle assumptions (sin(θ) ≈ θ, cos(θ) ≈ 1). The framework checks linearization validity:
-
-```matlab
-metrics = compute_performance_metrics(t, x, trajectory, params, u_log);
-
-if metrics.linearity.violated
-    fprintf('⚠ Linearization assumptions violated!\n');
-    fprintf('  Max attitude: %.1f deg (limit: 15 deg)\n', ...
-            rad2deg(metrics.linearity.max_actual_attitude));
-    fprintf('  Severity: %s\n', metrics.linearity.severity);
-end
-```
-
-Validate trajectory demands with:
-
-```matlab
-[feasible, warnings] = check_trajectory_feasibility(trajectory, params);
-if ~feasible
-    for i = 1:length(warnings)
-        fprintf('⚠ %s\n', warnings{i});
-    end
-end
-```
-
-## 📝 Key File Descriptions
-
-| File | Purpose |
-|------|---------|
-| `init_project.m` | Initialize MATLAB path (run once per session) |
-| `examples/paper_results.m` | Complete paper workflow example |
-| `examples/basic_simulation.m` | Simple simulation examples |
-| `utilities/simulate_quadrotor_pure.m` | Single simulation orchestrator |
-| `utilities/simulate_monte_carlo.m` | Monte Carlo study orchestrator |
-| `utilities/run_monte_carlo.m` | Parallel Monte Carlo trial execution using `parfor` |
-| `utilities/analyze_monte_carlo_results.m` | Monte Carlo results analysis with statistics and plots |
-| `utilities/DataManager.m` | Data I/O with validation |
-| `utilities/generate_paper_figures.m` | Paper figure generation |
-| `quadrotor_linear_6dof.m` | Vehicle model and LQR design |
-| `load_waypoints.m` | JSON waypoint file parser |
-| `generate_trajectory_auto.m` | Automatic trajectory method selection (recommended) |
-| `generate_trajectory_interp.m` | MAKIMA interpolation-based trajectory |
-| `generate_trajectory_minsnap.m` | Minimum snap optimization using `quadprog` |
-| `compute_lqr_control.m` | LQR control law with saturation |
-| `get_reference_state.m` | Reference state interpolation |
-| `quadrotor_closed_loop_dynamics.m` | ODE wrapper function |
-| `quadrotor_dynamics_pure.m` | Nonlinear 6DOF dynamics (NED) |
-| `simulate_quadrotor.m` | ODE45 integration with control logging |
-| `compute_performance_metrics.m` | Standardized performance evaluation |
-| `Constants.m` | Shared constants |
-| `setup_test_environment.m` | Test path configuration |
-| `run_tests.m` | Automated test discovery and execution |
-
-## 📚 Output and Results
-
-### Generated Plots
-
-* 3D trajectory (reference vs actual)
-* Position tracking (X, Y, Z vs time)
-* Attitude tracking (roll, pitch, yaw)
-* Control inputs (thrust and torques)
-* Velocity profiles
-* Monte Carlo results (histograms, boxplots)
-
-### Saved Data
-
-`./results/simulation_[trajectory]_[timestamp].mat` contains:
-* Time history
-* State history
-* Control history
-* Performance metrics
-* Parameters used
-* Configuration
-
-### Performance Metrics
-
-Computed by `compute_performance_metrics.m` and `analyze_monte_carlo_results.m`:
-
-* **Tracking Performance**:
-  - Position RMSE (overall and per-axis)
-  - Attitude RMSE
-  - Time in bounds (percentage within tolerance)
-  - Maximum errors
-
-* **Control Effort**:
-  - Total control effort (integral of u²)
-  - Mean/max thrust and torques
-  - Saturation analysis (% of time saturated)
-
-* **Linearization Validity**:
-  - Maximum attitude angles
-  - Angular velocity bounds
-  - Time spent violating linearization assumptions
-  - Severity assessment (NONE/MILD/MODERATE/SEVERE)
-
-* **Monte Carlo Statistics**:
-  - Mean, median, std, min/max RMSE
-  - Success rate (e.g., RMSE < 0.5m)
-  - Percentiles (e.g., 95th)
-
-## 🔬 Advanced Usage
-
-### Monte Carlo Analysis
-
-```matlab
-% Navigate to examples
 cd examples
-
-% Run complete paper workflow
-paper_results  % See examples/paper_results.m for configuration options
-
-% Or call directly with custom configuration
-params_nominal = quadrotor_linear_6dof();
-perturb_config.params = {
-    'm',   'normal', params_nominal.m, params_nominal.m * 0.05;
-    'Ixx', 'normal', params_nominal.Ixx, params_nominal.Ixx * 0.075;
-    'Iyy', 'normal', params_nominal.Iyy, params_nominal.Iyy * 0.075;
-    'Izz', 'normal', params_nominal.Izz, params_nominal.Izz * 0.075;
-    'L',   'normal', params_nominal.L, params_nominal.L * 0.005;
-};
-
-mc_options.N_trials = 1000;
-mc_options.parallel = true;
-
-simulate_monte_carlo('basic_maneuver.wpt', 'my_study', perturb_config, mc_options);
-
-% Generate figures from saved results
-generate_paper_figures('my_study', 'latest');
+robustness_study  % Complete workflow example
 ```
 
-### Custom Initial Conditions
+This runs parameter uncertainty analysis (500+ trials) and generates:
+- Performance distribution plots
+- Parameter sensitivity analysis
+- Correlation studies
+- Publication-ready figures
 
-```matlab
-% Start tilted with velocity
-x0 = zeros(12, 1);
-x0(4) = deg2rad(5);   % 5° roll
-x0(7) = 0.5;          % 0.5 m/s forward velocity
-simulate_quadrotor_pure('basic_maneuver.wpt', [], [], x0);
-```
+See [Monte Carlo Guide](./doc/monte_carlo_guide.md) for details.
 
 ## 🛠️ Requirements
 
-- MATLAB R2019b or later
-- Control System Toolbox (for `lqr`)
-- Optimization Toolbox (for `quadprog` in minimum snap)
-- Parallel Computing Toolbox (optional, for `parfor` in Monte Carlo)
-- Statistics and Machine Learning Toolbox (optional, for `boxplot` in Monte Carlo visualization)
-- No Simulink required
+- **MATLAB** R2019b or later
+- **Control System Toolbox** (for `lqr`)
+- **Optimization Toolbox** (for minimum snap trajectories)
+- Parallel Computing Toolbox (optional, for faster Monte Carlo)
+- Statistics Toolbox (optional, for boxplots)
+
+**No Simulink required** - Pure MATLAB implementation
+
+## 📊 State and Control
+
+**State Vector** (12 states):
+```
+x = [x, y, z, φ, θ, ψ, ẋ, ẏ, ż, p, q, r]ᵀ
+```
+
+**Control Vector** (4 inputs):
+```
+u = [F, τ_φ, τ_θ, τ_ψ]ᵀ
+```
+
+**Coordinate Frame**: NED (North-East-Down) aerospace convention
+
+## ❓ Common Issues
+
+**"Function not found"**: Run `init_project` from project root
+
+**Poor tracking**: Check trajectory segments ≥ 3s, tune LQR weights (increase position Q)
+
+**Plots don't appear**: If capturing output, set `options.plot = true`
+
+**See** [Installation Guide](./doc/installation.md#troubleshooting) for complete troubleshooting.
 
 ## 🔜 Future Work
 
-### Planned Features
-* Extended Kalman Filter (EKF) state estimation
-* Multiple controller comparison framework (PID, MPC, etc.)
-* Hardware deployment utilities
-* Automatic gain tuning utilities
-* KKT solver for minimum snap to eliminate Optimization Toolbox dependency
+- Simulation extension
+    - sensor and motor dynamics
+    - environmental disturbances
+    - aero effects such as drag, ground effect and rotor interaction
+- Abstraction layer to facilitate extension
+    - trajectory generation
+    - controller
+- Configuration based study definition
+- Advanced visualization
+- Extended Kalman Filter (EKF) state estimation
+- Multiple controller comparison framework
+- Gain scheduling for large-angle maneuvers
+- Hardware deployment utilities
 
-### Research Extensions
-* Gain scheduling for large-angle maneuvers
-* Nonlinear control methods (backstepping, sliding mode)
-* Trajectory optimization with obstacle avoidance
-* Formation flight control
+## 📚 Key References
 
-## 📚 References
-* LQR Theory: Anderson, B. D., & Moore, J. B. (1990). *Optimal Control: Linear Quadratic Methods*
-* Quadrotor Dynamics: Bouabdallah, S. (2007). *Design and Control of Quadrotors with Application to Autonomous Flying*
-* Minimum Snap: Mellinger, D., & Kumar, V. (2011). *Minimum Snap Trajectory Generation and Control for Quadrotors*. ICRA 2011.
-* NED Coordinates: Standard aerospace convention (ISO 8855, SAE J670)
+- **LQR Theory**: Anderson & Moore (1990). *Optimal Control: Linear Quadratic Methods*
+- **Quadrotor Dynamics**: Bouabdallah (2007). *Design and Control of Quadrotors*
+- **Minimum Snap**: Mellinger & Kumar (2011). *Minimum Snap Trajectory Generation*. ICRA 2011
 
-## 📧 Contact
+## 📖 Citation
 
-Project maintained as part of quadrotor control research.
+If you use this framework in your research, please cite:
+```bibtex
+@software{quadrotor_lqr_framework,
+  author = {Copeland, Trey},
+  title = {Quadrotor 6DOF LQR Control Framework},
+  year = {2025},
+  institution = {University of Tennessee, Knoxville},
+  course = {ME590}
+}
+```
+## 📧 Project Information
 
-**Last Updated**: October 31, 2025
+Graduate research project (ME590) at University of Tennessee, Knoxville.  
+Focused on quadrotor control and Monte Carlo robustness analysis.
+
+Author: Trey Copeland
+
+**Last Updated**: November 2025
