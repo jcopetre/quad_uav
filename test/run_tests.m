@@ -17,11 +17,7 @@ try
     cd(root_dir);
     
     % Add all necessary paths
-    addpath(fullfile(root_dir, 'test'));
-    addpath(fullfile(root_dir, 'vehicle'));
-    addpath(fullfile(root_dir, 'control'));
-    addpath(fullfile(root_dir, 'dynamics'));
-    addpath(fullfile(root_dir, 'trajectories'));
+    init_project();
     
     fprintf('✓ Test environment setup complete\n\n');
 catch ME

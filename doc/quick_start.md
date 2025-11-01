@@ -208,7 +208,28 @@ for i = 1:length(trajectories)
             results(i).metrics.tracking.rmse_position);
 end
 ```
+---
+### Flexible Input Modes
 
+`simulate_trajectory` accepts both filenames and waypoint structures:
+```matlab
+% Mode 1: Filename string (searches ./trajectories/)
+simulate_trajectory('basic_maneuver.wpt');
+
+% Mode 2: Waypoint structure (for programmatic generation)
+wpt = load_waypoints('figure_eight.wpt');
+% ... analyze or modify wpt ...
+simulate_trajectory(wpt);
+
+% Mode 3: Custom output location (useful for experiments)
+opts.output_dir = './experiments/my_study/results';
+simulate_trajectory(wpt, [], [], [], opts);
+```
+
+**Use cases:**
+- **Filename mode**: Standard simulations, simple workflows
+- **Structure mode**: Experiments, programmatic waypoint generation, batch processing
+- **Custom output**: Keep experiment results separate from production runs
 ## Next Steps
 
 ### Learn the System

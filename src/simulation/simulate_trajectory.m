@@ -1,30 +1,41 @@
-function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
-% SIMULATE_QUADROTOR_PURE - Main simulation script for quadrotor trajectory tracking
+function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
+% SIMULATE_TRAJECTORY - Main simulation script for quadrotor trajectory tracking
 %
-% Production-quality simulation framework for 6DOF quadrotor trajectory tracking
-% using LQR control and nonlinear dynamics. Supports batch processing and Monte Carlo.
+% Simulates a quadrotor following a specified trajectory using LQR control.
+% Handles waypoint loading, trajectory generation, control design, simulation,
+% and performance analysis with comprehensive logging and visualization.
 %
 % SYNTAX:
-%   simulate_trajectory(trajectory_file)
-%   simulate_trajectory(trajectory_file, Q, R)
-%   simulate_trajectory(trajectory_file, Q, R, x0)
-%   simulate_trajectory(trajectory_file, Q, R, x0, options)
+%   simulate_trajectory(trajectory_input)
+%   simulate_trajectory(trajectory_input, Q)
+%   simulate_trajectory(trajectory_input, Q, R)
+%   simulate_trajectory(trajectory_input, Q, R, x0)
+%   simulate_trajectory(trajectory_input, Q, R, x0, options)
 %   results = simulate_trajectory(...)
 %
 % INPUTS:
-%   trajectory_file - Filename in ./trajectories/ (e.g., 'basic_maneuver.wpt')
-%   Q               - (optional) LQR state weights (12x12), default provided
-%   R               - (optional) LQR control weights (4x4), default provided
-%   x0              - (optional) Initial state (12x1), default zeros
-%                     NOTE: Position (1:3) will be overridden by waypoint start
-%   options         - (optional) Struct with fields:
-%                     ...
-%                     .params       - Pre-designed params (overrides Q, R)
-%                                     When provided, uses these physical parameters
-%                                     with the included controller gains (K, u_hover).
-%                                     Primary use case: Monte Carlo simulations where
-%                                     you want to test perturbed plant dynamics against
-%                                     a nominal (fixed) controller design.
+%   trajectory_input - EITHER:
+%                      (1) Filename string (e.g., 'basic_maneuver.wpt')
+%                          Searches in ./trajectories/ directory
+%                      (2) Waypoint structure from load_waypoints()
+%                          Allows programmatic waypoint generation
+%   Q                - (optional) LQR state weight matrix [12x12]
+%                      Default: Balanced tracking (see quadrotor_linear_6dof.m)
+%   R                - (optional) LQR control weight matrix [4x4]
+%                      Default: Moderate control effort penalty
+%   x0               - (optional) Initial state vector [12x1]
+%                      [x y z roll pitch yaw u v w p q r]'
+%                      Default: Start at first waypoint, zero velocity/attitude
+%   options          - (optional) Structure with fields:
+%                      .verbose       - Print detailed progress (default: true)
+%                      .save_results  - Save results to .mat file (default: true)
+%                      .plot          - Show plots (default: true if no output)
+%                      .dt            - Trajectory timestep (default: 0.01 s)
+%                      .output_dir    - Where to save results (default: './results')
+%                      .params_plant  - Plant parameters if different from nominal
+%                                       Primary use case: Monte Carlo simulations where
+%                                       you want to test perturbed plant dynamics against
+%                                       a nominal (fixed) controller design.
 %
 % OUTPUTS:
 %   results - (optional) Structure containing simulation data:
@@ -39,6 +50,10 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
 %   % Simple: run with defaults, show plots
 %   simulate_trajectory('basic_maneuver.wpt');
 %
+%   % Programmatic waypoint structure
+%   wpt = load_waypoints('figure_eight.wpt');
+%   simulate_trajectory(wpt);
+%
 %   % Custom tuning, capture results
 %   Q_aggressive = diag([200 200 200 20 20 5 20 20 20 2 2 1]);
 %   results = simulate_trajectory('hover_test.wpt', Q_aggressive);
@@ -49,12 +64,14 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
 %   x0(7) = 0.5;          % 0.5 m/s forward velocity
 %   simulate_trajectory('basic_maneuver.wpt', [], [], x0);
 %
-%   % Batch mode for Monte Carlo
+%   % Batch mode for Monte Carlo with custom output location
 %   opts.verbose = false;
 %   opts.plot = false;
+%   opts.save_results = true;
+%   opts.output_dir = './experiments/trajectory_limits/results';
 %   results = simulate_trajectory('basic_maneuver.wpt', [], [], [], opts);
 %
-% See also: quadrotor_linear_6dof, simulate_quadrotor, compute_performance_metrics
+% See also: quadrotor_linear_6dof, ode_simulate, compute_performance_metrics
 
 % Author: Trey Copeland
 % Date: 2025-10-09
@@ -65,9 +82,36 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
     %  STEP 1: INPUT VALIDATION AND DEFAULTS
     %  ========================================================================
     
-    % Validate trajectory file
-    assert(ischar(trajectory_file) || isstring(trajectory_file), ...
-           'trajectory_file must be a string');
+    % Validate and process trajectory input
+    if ischar(trajectory_input) || isstring(trajectory_input)
+        % It's a filename - will load later
+        trajectory_file = char(trajectory_input);
+        wpt = [];  % Will load in Step 4
+        is_filename = true;
+    elseif isstruct(trajectory_input)
+        % It's already a waypoint structure
+        if ~all(isfield(trajectory_input, {'time', 'position'}))
+            error('Waypoint structure must have ''time'' and ''position'' fields');
+        end
+        wpt = trajectory_input;
+        trajectory_file = '<programmatic>';  % For logging
+        is_filename = false;
+    else
+        error('trajectory_input must be a filename string or waypoint structure');
+    end
+    
+    % Handle optional arguments
+    if nargin < 2 || isempty(Q)
+        Q = [];  % Use defaults in quadrotor_linear_6dof
+    end
+    
+    if nargin < 3 || isempty(R)
+        R = [];  % Use defaults in quadrotor_linear_6dof
+    end
+    
+    if nargin < 4
+        x0 = [];  % Will set default later
+    end
     
     % Set default options
     if nargin < 5 || isempty(options)
@@ -78,52 +122,45 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
     defaults.save_results = true;
     defaults.plot = (nargout == 0);
     defaults.dt = 0.01;
+    defaults.output_dir = './results';  % Default to standard results directory
+    defaults.params_plant = [];  % Use same as controller by default
+    
     options = set_default_options(options, defaults);
     
-    % Convenience flag for output
     verbose = options.verbose;
     
     %% ========================================================================
-    %  STEP 2: DISPLAY HEADER
+    %  STEP 2: PRINT HEADER
     %  ========================================================================
     
     if verbose
         fprintf('\n');
         fprintf('================================================================\n');
-        fprintf('       Quadrotor 6DOF LQR Control System\n');
-        fprintf('       Pure MATLAB Implementation\n');
-        fprintf('================================================================\n\n');
+        fprintf('Quadrotor 6DOF LQR Control System\n');
+        fprintf('Pure MATLAB Implementation\n');
+        fprintf('================================================================\n');
     end
     
     %% ========================================================================
-    %  STEP 3: LOAD VEHICLE MODEL AND DESIGN LQR CONTROLLER
+    %  STEP 3: LOAD VEHICLE MODEL AND DESIGN CONTROLLER
     %  ========================================================================
     
     if verbose
         fprintf('Step 1/6: Loading quadrotor model and designing controller...\n');
     end
     
-    % Check if params provided via options (for Monte Carlo with fixed controller)
-    if isfield(options, 'params') && ~isempty(options.params)
-        % Use pre-designed params (e.g., fixed K with varied mass)
-        params = options.params;
+    % Design controller with nominal parameters
+    params = quadrotor_linear_6dof(Q, R, verbose);
+    
+    % Handle plant vs controller parameter mismatch for robustness analysis
+    if isfield(options, 'params_plant') && ~isempty(options.params_plant)
+        params_plant = options.params_plant;
         if verbose
-            fprintf('  Using provided params (mass=%.3f kg, K fixed)\n', params.m);
-            fprintf('  Controller: Pre-designed (from options)\n');
+            fprintf('  Using different plant parameters for robustness testing\n');
+            fprintf('  Controller designed for nominal, plant uses perturbed parameters\n');
         end
     else
-        % Design new controller from Q, R
-        if nargin < 2 || isempty(Q)
-            Q = [];  % Use defaults in quadrotor_linear_6dof
-        end
-        
-        if nargin < 3 || isempty(R)
-            R = [];  % Use defaults in quadrotor_linear_6dof
-        end
-        
-        % Design LQR controller with provided or default weights
-        params = quadrotor_linear_6dof(Q, R, verbose);
-        
+        params_plant = params;  % No mismatch - controller and plant match
         if verbose
             fprintf('  Vehicle: 500g quadrotor\n');
             fprintf('  Controller: LQR with optimal gains\n');
@@ -140,19 +177,32 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
         fprintf('\nStep 2/6: Loading trajectory...\n');
     end
     
-    % Construct full path to trajectory file
-    trajectory_path = fullfile('./trajectories', trajectory_file);
-    
-    % Validate file exists
-    if ~exist(trajectory_path, 'file')
-        error('Trajectory file not found: %s', trajectory_path);
+    % Load waypoints if filename was provided
+    if is_filename
+        % Construct full path to trajectory file
+        trajectory_path = fullfile('./trajectories', trajectory_file);
+        
+        % Validate file exists
+        if ~exist(trajectory_path, 'file')
+            error('Trajectory file not found: %s', trajectory_path);
+        end
+        
+        % Load waypoints
+        wpt = load_waypoints(trajectory_path);
+        
+        if verbose
+            fprintf('  Loaded: %s\n', wpt.metadata.name);
+        end
+    else
+        % Using programmatically generated waypoints
+        if verbose && isfield(wpt, 'metadata') && isfield(wpt.metadata, 'name')
+            fprintf('  Using programmatic waypoints: %s\n', wpt.metadata.name);
+        else
+            fprintf('  Using programmatically generated waypoints\n');
+        end
     end
     
-    % Load waypoints
-    wpt = load_waypoints(trajectory_path);
-    
     if verbose
-        fprintf('  Loaded: %s\n', wpt.metadata.name);
         fprintf('  Waypoints: %d\n', length(wpt.time));
         fprintf('  Duration: %.1f seconds\n', wpt.time(end) - wpt.time(1));
     end
@@ -180,7 +230,7 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
     end
     
     % Handle initial state
-    if nargin >= 4 && ~isempty(x0)
+    if ~isempty(x0)
         % User provided initial state
         assert(length(x0) == 12, 'x0 must be 12x1 state vector');
         
@@ -222,13 +272,12 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
     ode_options = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
     
     tic;
-    [t, x, u_log] = ode_simulate(x0_full, tspan, params, trajectory, ode_options);
+    [t, x, u_log] = ode_simulate(x0_full, tspan, params_plant, trajectory, ode_options);
     sim_time = toc;
     
     if verbose
         fprintf('  Simulation complete: %.3f seconds (%.0f time steps)\n', ...
                 sim_time, length(t));
-        fprintf('  Real-time factor: %.1fx\n', tspan(end) / sim_time);
     end
     
     %% ========================================================================
@@ -242,35 +291,106 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
     metrics = compute_performance_metrics(t, x, trajectory, params, u_log);
     
     if verbose
-        fprintf('\n');
-        fprintf('================================================================\n');
-        fprintf('                    PERFORMANCE SUMMARY\n');
-        fprintf('================================================================\n');
-        fprintf('Position Tracking:\n');
-        fprintf('  RMSE:           %.4f m\n', metrics.tracking.rmse_position);
-        fprintf('  Max error:      %.4f m\n', metrics.tracking.max_position_error);
-        fprintf('  Time in bounds: %.1f%% (within 10cm)\n', metrics.tracking.time_in_bounds);
-        fprintf('\nAttitude:\n');
-        fprintf('  RMSE:           %.2f deg\n', rad2deg(metrics.tracking.rmse_attitude));
-        fprintf('  Max roll:       %.2f deg\n', rad2deg(metrics.tracking.max_roll));
-        fprintf('  Max pitch:      %.2f deg\n', rad2deg(metrics.tracking.max_pitch));
-        fprintf('\nControl Effort:\n');
-        fprintf('  Total effort:   %.2f\n', metrics.control.total_effort);
-        fprintf('  Mean thrust:    %.2f N (hover: %.2f N)\n', ...
-                metrics.control.mean_thrust, params.u_hover(1));
-        fprintf('  Thrust sat.:    %.1f%% of time\n', metrics.control.thrust_saturation_pct);
-        fprintf('  Torque sat.:    %.1f%% of time\n', metrics.control.torque_saturation_pct);
-        fprintf('\nSuccess Criteria:\n');
-        fprintf('  Completed:      %s\n', bool_to_str(metrics.success.completed));
-        fprintf('  Tracking OK:    %s (RMSE < 0.5m)\n', bool_to_str(metrics.success.position_acceptable));
-        fprintf('  Attitude safe:  %s (angles < 60deg)\n', bool_to_str(metrics.success.attitude_safe));
-        fprintf('  Overall:        %s\n', bool_to_str(metrics.success.overall));
-        fprintf('\nSummary Score:    %.3f (lower is better)\n', metrics.summary_weighted);
-        fprintf('================================================================\n\n');
+        fprintf('  Position RMSE: %.4f m\n', metrics.tracking.rmse_position);
+        fprintf('  Attitude RMSE: %.2f deg\n', rad2deg(metrics.tracking.rmse_attitude));
+        fprintf('  Control effort: %.2f\n', metrics.control.total_effort);
+        fprintf('  Overall success: %s\n', bool2str(metrics.success.overall));
     end
     
     %% ========================================================================
-    %  STEP 8: VISUALIZATION
+    %  STEP 8: PRINT PERFORMANCE SUMMARY
+    %  ========================================================================
+    
+    if verbose
+        fprintf('\n');
+        fprintf('================================================================\n');
+        fprintf('PERFORMANCE SUMMARY\n');
+        fprintf('================================================================\n');
+        fprintf('Position Tracking:\n');
+        fprintf('  RMSE:             %.4f m\n', metrics.tracking.rmse_position);
+        fprintf('  Max error:        %.4f m\n', metrics.tracking.max_position_error);
+        fprintf('  Time in bounds:   %.1f%% (within 10cm)\n', ...
+                metrics.tracking.time_in_bounds * 100);
+        fprintf('\n');
+        fprintf('Attitude:\n');
+        fprintf('  RMSE:             %.2f deg\n', rad2deg(metrics.tracking.rmse_attitude));
+        fprintf('  Max roll:         %.2f deg\n', rad2deg(metrics.tracking.max_roll));
+        fprintf('  Max pitch:        %.2f deg\n', rad2deg(metrics.tracking.max_pitch));
+        fprintf('\n');
+        fprintf('Control Effort:\n');
+        fprintf('  Total effort:     %.2f\n', metrics.control.total_effort);
+        fprintf('  Mean thrust:      %.2f N (hover: %.2f N)\n', ...
+                metrics.control.mean_thrust, params.u_hover(1));
+        fprintf('  Thrust sat.:      %.1f%% of time\n', ...
+                metrics.control.thrust_saturation_pct);
+        fprintf('  Torque sat.:      %.1f%% of time\n', ...
+                metrics.control.torque_saturation_pct);
+        fprintf('\n');
+        fprintf('Success Criteria:\n');
+        fprintf('  Completed:        %s\n', bool2str(metrics.success.completed));
+        fprintf('  Tracking OK:      %s (RMSE < 0.5m)\n', ...
+                bool2str(metrics.success.position_acceptable));
+        fprintf('  Attitude safe:    %s (angles < 60deg)\n', ...
+                bool2str(metrics.success.attitude_safe));
+        fprintf('  Overall:          %s\n', bool2str(metrics.success.overall));
+        fprintf('\n');
+        fprintf('Summary Score: %.3f (lower is better)\n', metrics.summary_weighted);
+        fprintf('================================================================\n');
+        fprintf('\n');
+    end
+    
+    %% ========================================================================
+    %  STEP 9: SAVE RESULTS
+    %  ========================================================================
+    
+    if options.save_results
+        % Create output directory if needed
+        output_dir = options.output_dir;
+        if ~exist(output_dir, 'dir')
+            mkdir(output_dir);
+        end
+        
+        % Generate filename label from trajectory
+        if is_filename
+            [~, base_name, ~] = fileparts(trajectory_file);
+            label = base_name;
+        else
+            if isfield(wpt, 'metadata') && isfield(wpt.metadata, 'name')
+                % Use metadata name if available
+                label = matlab.lang.makeValidName(wpt.metadata.name);
+            else
+                % Generic label for programmatic waypoints
+                label = 'programmatic_trajectory';
+            end
+        end
+        
+        % Prepare results structure
+        results_struct = struct();
+        results_struct.t = t;
+        results_struct.x = x;
+        results_struct.u_log = u_log;  % Use u_log to match DataSchemas
+        results_struct.trajectory = trajectory;
+        results_struct.params = params;
+        results_struct.params_plant = params_plant;
+        results_struct.metrics = metrics;
+        results_struct.config = struct('Q', params.Q, 'R', params.R, ...
+                                       'x0', x0_full, 'dt', options.dt);
+        results_struct.timestamp = datetime('now');
+        
+        % Save with proper organization
+        save_options = struct();
+        save_options.verbose = verbose;
+        save_options.category = 'simulation';
+        
+        filepath = DataManager.save_results(results_struct, label, output_dir, save_options);
+        
+        if verbose
+            fprintf('Results saved: %s\n\n', filepath);
+        end
+    end
+    
+    %% ========================================================================
+    %  STEP 10: GENERATE PLOTS
     %  ========================================================================
     
     if options.plot
@@ -278,191 +398,128 @@ function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
             fprintf('Generating plots...\n');
         end
         
-        % Compute reference trajectory for plotting
-        x_ref = zeros(length(t), 12);
-        for i = 1:length(t)
-            x_ref(i, :) = get_reference_state(t(i), trajectory);
-        end
+        % Create figure with subplots
+        fig = figure('Position', [100, 100, 1400, 900], ...
+                     'Name', sprintf('Trajectory Tracking: %s', trajectory_file));
         
-        % Create comprehensive figure
-        fig = figure('Position', [50, 50, 1600, 1000], 'Name', 'Quadrotor Simulation Results');
-        
-        % 3D Trajectory (top left, spans 2 rows)
-        subplot(3, 3, [1, 4]);
-        plot3(x(:,1), x(:,2), x(:,3), 'b-', 'LineWidth', 2); hold on;
-        plot3(wpt.position(:,1), wpt.position(:,2), wpt.position(:,3), ...
-              'ro-', 'MarkerSize', 8, 'MarkerFaceColor', 'r', 'LineWidth', 1.5);
-        plot3(x(1,1), x(1,2), x(1,3), 'gs', 'MarkerSize', 12, 'MarkerFaceColor', 'g');
-        plot3(x(end,1), x(end,2), x(end,3), 'md', 'MarkerSize', 12, 'MarkerFaceColor', 'm');
-        grid on; axis equal;
-        xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
-        title('3D Trajectory');
-        legend('Actual', 'Waypoints', 'Start', 'End', 'Location', 'best');
-        view(45, 30);
-        
-        % Position tracking X
-        subplot(3, 3, 2);
+        % Position tracking
+        subplot(3, 3, 1);
         plot(t, x(:,1), 'b-', 'LineWidth', 1.5); hold on;
-        plot(t, x_ref(:,1), 'r--', 'LineWidth', 1);
+        plot(trajectory.time, trajectory.position(:,1), 'r--', 'LineWidth', 1);
         grid on;
-        xlabel('Time (s)'); ylabel('X (m)');
+        xlabel('Time (s)'); ylabel('X Position (m)');
         title('X Position Tracking');
         legend('Actual', 'Reference', 'Location', 'best');
         
-        % Position tracking Y
-        subplot(3, 3, 3);
+        subplot(3, 3, 2);
         plot(t, x(:,2), 'b-', 'LineWidth', 1.5); hold on;
-        plot(t, x_ref(:,2), 'r--', 'LineWidth', 1);
+        plot(trajectory.time, trajectory.position(:,2), 'r--', 'LineWidth', 1);
         grid on;
-        xlabel('Time (s)'); ylabel('Y (m)');
+        xlabel('Time (s)'); ylabel('Y Position (m)');
         title('Y Position Tracking');
         legend('Actual', 'Reference', 'Location', 'best');
         
-        % Position tracking Z
-        subplot(3, 3, 5);
+        subplot(3, 3, 3);
         plot(t, x(:,3), 'b-', 'LineWidth', 1.5); hold on;
-        plot(t, x_ref(:,3), 'r--', 'LineWidth', 1);
+        plot(trajectory.time, trajectory.position(:,3), 'r--', 'LineWidth', 1);
         grid on;
-        xlabel('Time (s)'); ylabel('Z (m)');
-        title('Z Position (Altitude)');
+        xlabel('Time (s)'); ylabel('Z Position (m)');
+        title('Z Position (Altitude) Tracking');
         legend('Actual', 'Reference', 'Location', 'best');
         
+        % 3D Trajectory
+        subplot(3, 3, 4);
+        plot3(x(:,1), x(:,2), x(:,3), 'b-', 'LineWidth', 2); hold on;
+        plot3(trajectory.position(:,1), trajectory.position(:,2), ...
+              trajectory.position(:,3), 'r--', 'LineWidth', 1);
+        plot3(x(1,1), x(1,2), x(1,3), 'go', 'MarkerSize', 10, 'MarkerFaceColor', 'g');
+        plot3(x(end,1), x(end,2), x(end,3), 'rs', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
+        grid on; axis equal;
+        xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+        title('3D Trajectory');
+        legend('Actual', 'Reference', 'Start', 'End', 'Location', 'best');
+        view(45, 30);
+        
         % Attitude angles
-        subplot(3, 3, 6);
-        plot(t, rad2deg(x(:,4)), 'r-', 'LineWidth', 1.5); hold on;
-        plot(t, rad2deg(x(:,5)), 'g-', 'LineWidth', 1.5);
-        plot(t, rad2deg(x(:,6)), 'b-', 'LineWidth', 1.5);
+        subplot(3, 3, 5);
+        plot(t, rad2deg(x(:,4)), 'LineWidth', 1.5); hold on;
+        plot(t, rad2deg(x(:,5)), 'LineWidth', 1.5);
+        plot(t, rad2deg(x(:,6)), 'LineWidth', 1.5);
         grid on;
         xlabel('Time (s)'); ylabel('Angle (deg)');
         title('Attitude Angles');
-        legend('Roll (\phi)', 'Pitch (\theta)', 'Yaw (\psi)', 'Location', 'best');
+        legend('Roll', 'Pitch', 'Yaw', 'Location', 'best');
         
-        % Linear velocities
-        subplot(3, 3, 7);
-        plot(t, x(:,7), 'r-', 'LineWidth', 1.5); hold on;
-        plot(t, x(:,8), 'g-', 'LineWidth', 1.5);
-        plot(t, x(:,9), 'b-', 'LineWidth', 1.5);
+        % Velocities
+        subplot(3, 3, 6);
+        plot(t, x(:,7:9), 'LineWidth', 1.5);
         grid on;
         xlabel('Time (s)'); ylabel('Velocity (m/s)');
-        title('Linear Velocities');
-        legend('V_x', 'V_y', 'V_z', 'Location', 'best');
+        title('Body Velocities');
+        legend('u', 'v', 'w', 'Location', 'best');
         
         % Control inputs - Thrust
-        subplot(3, 3, 8);
+        subplot(3, 3, 7);
         plot(t, u_log(:,1), 'b-', 'LineWidth', 1.5); hold on;
-        yline(params.u_hover(1), 'r--', 'LineWidth', 1, 'DisplayName', 'Hover');
-        yline(params.u_max(1), 'k:', 'LineWidth', 1, 'DisplayName', 'Max');
+        yline(params.u_hover(1), 'r--', 'Hover', 'LineWidth', 1);
+        yline(params.u_min(1), 'k:', 'Min', 'LineWidth', 1);
+        yline(params.u_max(1), 'k:', 'Max', 'LineWidth', 1);
         grid on;
         xlabel('Time (s)'); ylabel('Thrust (N)');
         title('Thrust Command');
-        legend('Location', 'best');
+        ylim([0, params.u_max(1) * 1.1]);
         
         % Control inputs - Torques
-        subplot(3, 3, 9);
-        plot(t, u_log(:,2), 'r-', 'LineWidth', 1.5); hold on;
-        plot(t, u_log(:,3), 'g-', 'LineWidth', 1.5);
-        plot(t, u_log(:,4), 'b-', 'LineWidth', 1.5);
-        yline(params.u_max(2), 'k:', 'LineWidth', 1);
-        yline(params.u_min(2), 'k:', 'LineWidth', 1);
+        subplot(3, 3, 8);
+        plot(t, u_log(:,2:4), 'LineWidth', 1.5); hold on;
+        yline(params.u_min(2), 'k:', 'Min', 'LineWidth', 1);
+        yline(params.u_max(2), 'k:', 'Max', 'LineWidth', 1);
         grid on;
         xlabel('Time (s)'); ylabel('Torque (N·m)');
-        title('Control Torques');
-        legend('\tau_\phi', '\tau_\theta', '\tau_\psi', 'Location', 'best');
+        title('Torque Commands');
+        legend('\tau_x (roll)', '\tau_y (pitch)', '\tau_z (yaw)', ...
+               'Location', 'best');
         
-        % Overall title
-        sgtitle(sprintf('Quadrotor LQR Control - %s', wpt.metadata.name), ...
+        % Position error
+        subplot(3, 3, 9);
+        x_ref_interp = interp1(trajectory.time, trajectory.position, t);
+        pos_error = vecnorm(x(:,1:3) - x_ref_interp, 2, 2);
+        plot(t, pos_error * 100, 'b-', 'LineWidth', 1.5); hold on;
+        yline(10, 'r--', '10cm threshold', 'LineWidth', 1);
+        grid on;
+        xlabel('Time (s)'); ylabel('Position Error (cm)');
+        title('Position Tracking Error');
+        
+        sgtitle(sprintf('Trajectory Tracking Results: %s', trajectory_file), ...
                 'FontSize', 14, 'FontWeight', 'bold');
         
         if verbose
-            fprintf('  Plot created successfully\n');
+            fprintf('  Plots generated\n\n');
         end
     end
     
     %% ========================================================================
-    %  STEP 9: SAVE RESULTS
-    %  ========================================================================
-    
-    timestamp = datestr(now, 'yyyy-mm-dd_HH-MM-SS');
-    
-    if options.save_results
-        if verbose
-            fprintf('\nSaving results...\n');
-        end
-        
-        % Create results directory if it doesn't exist
-        results_dir = './results';
-        if ~exist(results_dir, 'dir')
-            mkdir(results_dir);
-        end
-        
-        % Generate filename with timestamp  
-        [~, traj_name, ~] = fileparts(trajectory_file);
-        filename = sprintf('simulation_%s_%s.mat', traj_name, timestamp);
-        filepath = fullfile(results_dir, filename);
-        
-        % Package results
-        results_struct.t = t;
-        results_struct.x = x;
-        results_struct.u_log = u_log;
-        results_struct.trajectory = trajectory;
-        results_struct.params = params;
-        results_struct.metrics = metrics;
-        results_struct.config.trajectory_file = trajectory_file;
-        results_struct.config.Q = params.Q;
-        results_struct.config.R = params.R;
-        results_struct.config.x0 = x0_full;
-        results_struct.config.options = options;
-        results_struct.timestamp = timestamp;
-        results_struct.sim_time = sim_time;
-        
-        % Save to file
-        [~, traj_name, ~] = fileparts(trajectory_file);
-        label = sprintf('simulation_%s', traj_name);
-        save_options = struct('verbose', verbose, 'validate', true);
-        filepath = DataManager.save_results(results_struct, label, './results', save_options);
-        
-        if verbose
-            fprintf('  Results saved to: %s\n', filepath);
-            fprintf('  File size: %.2f KB\n', dir(filepath).bytes / 1024);
-        end
-    end
-    
-    %% ========================================================================
-    %  STEP 10: RETURN RESULTS (if requested)
+    %  STEP 11: RETURN RESULTS
     %  ========================================================================
     
     if nargout > 0
+        results = struct();
         results.t = t;
         results.x = x;
-        results.u_log = u_log;
+        results.u_log = u_log;  % Use u_log to match DataSchemas
         results.trajectory = trajectory;
         results.params = params;
+        results.params_plant = params_plant;
         results.metrics = metrics;
-        results.config.trajectory_file = trajectory_file;
-        results.config.Q = params.Q;
-        results.config.R = params.R;
-        results.config.x0 = x0_full;
-        results.config.options = options;
-        results.timestamp = timestamp;
-        results.sim_time = sim_time;
+        results.config = struct('Q', params.Q, 'R', params.R, ...
+                               'x0', x0_full, 'dt', options.dt);
+        results.timestamp = datetime('now');
     end
     
-    if verbose
-        fprintf('\n');
-        fprintf('================================================================\n');
-        fprintf('                  SIMULATION COMPLETE!\n');
-        fprintf('================================================================\n\n');
-    end
-
 end
 
-%% ========================================================================
-%  HELPER FUNCTIONS
-%  ========================================================================
-
-function str = bool_to_str(bool_val)
-    % BOOL_TO_STR - Convert boolean to YES/NO string
-    if bool_val
+function str = bool2str(value)
+    if value
         str = 'YES';
     else
         str = 'NO';

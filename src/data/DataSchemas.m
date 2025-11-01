@@ -90,7 +90,6 @@ classdef DataSchemas
                 'position',     % Position trajectory [3 x n] [m]
                 'velocity',     % Velocity trajectory [3 x n] [m/s]
                 'acceleration', % Acceleration trajectory [3 x n] [m/s²]
-                'jerk',         % Jerk trajectory [3 x n] [m/s³]
                 'yaw'           % Yaw angle trajectory [1 x n] [rad]
             };
             
@@ -99,6 +98,7 @@ classdef DataSchemas
                 'yaw_rate',          % Yaw rate [1 x n] [rad/s]
                 'roll',              % Reference roll [1 x n] [rad]
                 'pitch',             % Reference pitch [1 x n] [rad]
+                'jerk',              % Jerk trajectory [3 x n] [m/s³]
                 'attitude',          % Attitude angles [3 x n] [rad]
                 'omega',             % Angular velocity [3 x n] [rad/s] 
                 'method',            % Generation method ('makima' or 'minsnap')
