@@ -66,17 +66,27 @@ fprintf('Step 3: Generating trajectories...\n');
 
 fprintf('  Method 1: MAKIMA Interpolation... ');
 tic;
-traj_interp = generate_trajectory_interp(wpt, params, 0.01);  
-traj_interp.attitude(:, 1:2) = 0;
+traj_interp = generate_trajectory_interp(wpt, params, 0.01);
 t_interp_gen = toc;
 fprintf('%.3f s\n', t_interp_gen);
 
 fprintf('  Method 2: Minimum Snap... ');
 tic;
 traj_minsnap = generate_trajectory_minsnap(wpt, params, 0.01);
-traj_minsnap.attitude(:, 1:2) = 0;
 t_minsnap_gen = toc;
 fprintf('%.3f s\n\n', t_minsnap_gen);
+
+% IMPORTANT: Zero out feedforward attitudes to isolate controller behavior.
+% This forces the LQR controller to generate ALL attitude commands from
+% position/velocity tracking errors alone, without kinematic hints from
+% the trajectory generators. This tests pure controller performance.
+%
+% NOTE: In normal operation, feedforward attitudes improve tracking by
+% providing the orientation needed to achieve desired accelerations. This
+% test intentionally removes them to evaluate baseline LQR capability.
+fprintf('  Zeroing feedforward attitudes (testing pure LQR tracking)\n\n');
+traj_interp.attitude(:, 1:2) = 0;
+traj_minsnap.attitude(:, 1:2) = 0;
 
 %% Simulate Both Trajectories
 fprintf('Step 4: Running closed-loop simulations...\n');
