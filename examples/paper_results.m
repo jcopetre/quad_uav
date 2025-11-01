@@ -25,7 +25,7 @@ init_project();
 TRAJECTORY_FILE = 'simple_square.wpt';
 
 % Choose run configuration
-RUN_TYPE = 'full';  % Options: 'test', 'pilot', 'full', 'custom'
+RUN_TYPE = 'test';  % Options: 'test', 'pilot', 'full', 'custom'
 
 fprintf('=================================================================\n');
 fprintf('PAPER WORKFLOW EXAMPLE\n');
@@ -120,7 +120,7 @@ switch lower(RUN_TYPE)
         fprintf('Custom perturbations: ±20%% mass, ±20%% inertia\n');
         fprintf('Expected time: ~2 hours\n\n');
         
-        simulate_monte_carlo(TRAJECTORY_FILE, run_label, perturb_config, mc_options);
+        simulate_monte_carlo(TRAJECTORY_FILE, run_label, [], mc_options);
         
     otherwise
         error('Unknown RUN_TYPE: %s (use ''pilot'', ''full'', or ''custom'')', RUN_TYPE);
