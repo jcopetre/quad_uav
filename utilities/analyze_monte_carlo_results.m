@@ -702,15 +702,6 @@ function fig = plot_cdfs(metrics_data, nominal)
     end
 end
 
-function cmap = redblue()
-    % Red-white-blue colormap for correlation visualization
-    n = 64;
-    r = [(0:n-1)'/n; ones(n,1)];
-    g = [(0:n-1)'/n; flipud((0:n-1)'/n)];
-    b = [ones(n,1); flipud((0:n-1)'/n)];
-    cmap = [r g b];
-end
-
 function save_figures(figures, plot_dir)
     % Save all figures to disk
     

@@ -94,14 +94,14 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     fprintf('=======================================================\n\n');
     
     %% Load Data
-    fprintf('[1] Loading nominal simulation...\n');
+    fprintf('Loading nominal simulation...\n');
     nominal_file = fullfile(results_dir, 'nominal.mat');
     if ~exist(nominal_file, 'file')
         error('Nominal data file not found: %s', nominal_file);
     end
     nominal = DataManager.load_results(nominal_file);
     
-    fprintf('[2] Loading Monte Carlo results...\n');
+    fprintf('Loading Monte Carlo results...\n');
     mc_file = fullfile(results_dir, 'monte_carlo.mat');
     if ~exist(mc_file, 'file')
         error('Monte Carlo data file not found: %s', mc_file);
@@ -109,36 +109,25 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     % Monte Carlo results have different schema - skip validation and migration
     mc = DataManager.load_results(mc_file, struct('validate', false, 'migrate', false));
     
+    fprintf('Generating figures...')
     %% Generate Figures
-    fprintf('[3] Creating 3D tracking visualization...\n');
     fig1 = create_3d_tracking_figure(nominal);
-    saveas(fig1, fullfile(figures_dir, 'tracking_3d.png'));
-    if options.close_figures
-        close(fig1);
-    end
+    save_and_close_figure(fig1, fullfile(figures_dir, 'tracking_3d.png'),...
+        options.close_figures);    
     
-    fprintf('[4] Creating tracking timeseries...\n');
     fig2 = create_tracking_timeseries(nominal);
-    saveas(fig2, fullfile(figures_dir, 'tracking_timeseries.png'));
-    if options.close_figures
-        close(fig2);
-    end
+    save_and_close_figure(fig2, fullfile(figures_dir, 'tracking_timeseries.png'),...
+        options.close_figures)
     
-    fprintf('[5] Creating control inputs plot...\n');
     fig3 = create_control_inputs_figure(nominal);
-    saveas(fig3, fullfile(figures_dir, 'control_inputs.png'));
-    if options.close_figures
-        close(fig3);
-    end
+    save_and_close_figure(fig3, fullfile(figures_dir, 'control_inputs.png'),...
+        options.close_figures);
     
-    fprintf('[6] Creating attitdue dynamics...\n');
     fig4 = create_attitude_dynamics_figure(nominal);
-    saveas(fig4, fullfile(figures_dir, 'attitude_dynamics.png'));
-    if options.close_figures
-        close(fig3);
-    end
+    save_and_close_figure(fig4, fullfile(figures_dir, 'attitude_dynamics.png'),...
+        options.close_figures);
 
-    fprintf('[7] Running Monte Carlo analysis and generating plots...\n');
+    fprintf('Running Monte Carlo analysis and generating plots...\n');
     analysis_options.plot = true;
     analysis_options.save_plots = true;
     analysis_options.plot_dir = figures_dir;
@@ -147,7 +136,7 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     
     analysis = analyze_monte_carlo_results(mc, analysis_options);
     
-    fprintf('[8] Copying MC figures to output directory...\n');
+    fprintf('Copying MC figures to output directory...\n');
     % analyze_monte_carlo_results already saved figures to figures_dir
     % Just confirm they exist
     mc_figure_files = {'distributions.png', 'boxplots.png', 'correlation.png'};
@@ -169,16 +158,6 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     fprintf('✅ FIGURES COMPLETE\n');
     fprintf('=======================================================\n');
     fprintf('Output directory: %s\n', figures_dir);
-    fprintf('\nFiles created:\n');
-    fprintf('  - tracking_3d.png\n');
-    fprintf('  - tracking_timeseries.png\n');
-    fprintf('  - control_inputs.png\n');
-    fprintf('  - attitude_dynamics.png\n');
-    fprintf('  - mc_boxplots.png\n');
-    fprintf('  - mc_correlation.png\n');
-    fprintf('  - mc_distributions.png\n');
-    fprintf('  - paper_metrics.txt\n');
-    fprintf('=======================================================\n\n');
 end
 
 %% ========================================================================
@@ -849,15 +828,6 @@ function write_paper_metrics(nominal, mc, analysis, filename)
     fclose(fid);
 end
 
-function cmap = redblue()
-    % Red-white-blue colormap for correlation visualization
-    n = 64;
-    r = [(0:n-1)'/n; ones(n,1)];
-    g = [(0:n-1)'/n; flipud((0:n-1)'/n)];
-    b = [ones(n,1); flipud((0:n-1)'/n)];
-    cmap = [r g b];
-end
-
 function listing = list_available_runs(run_label)
     % List available run directories for debugging
     pattern = fullfile('.', 'results', sprintf('%s_*', run_label));
@@ -872,5 +842,19 @@ function listing = list_available_runs(run_label)
                 listing = [listing sprintf('  - %s\n', dirs(i).name)]; %#ok<AGROW>
             end
         end
+    end
+end
+
+function save_and_close_figure(fig, filename, close_fig)
+    % SAVE_AND_CLOSE_FIGURE - Unified figure saving and optional closing
+    %
+    % INPUTS:
+    %   fig       - Figure handle
+    %   filename  - Full path to save location
+    %   close_fig - Boolean to close after saving
+    
+    saveas(fig, filename);
+    if close_fig
+        close(fig);
     end
 end
