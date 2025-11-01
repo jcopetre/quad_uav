@@ -593,7 +593,7 @@ function yaw = generate_yaw_trajectory(trajectory, wpt_time, wpt_yaw, dt)
     n_points = length(trajectory.time);
     yaw = zeros(n_points, 1);
     
-    if all(isnan(wpt_yaw))
+    if all(isnan(wpt_yaw)) % All Constants.AUTO_YAW
         % All auto: calculate from velocity direction
         for i = 1:n_points
             vx = trajectory.velocity(i, 1);

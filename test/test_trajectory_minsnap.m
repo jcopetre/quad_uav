@@ -639,7 +639,7 @@ function test_yaw_mixed()
         4, 2, 1;
         6, 2, 1
     ];
-    wpt.yaw = [0; NaN; pi/2; NaN];  % Mixed
+    wpt.yaw = [0; Constants.AUTO_YAW; pi/2; Constants.AUTO_YAW];  % Mixed
     
     trajectory = generate_trajectory_minsnap(wpt, params, 0.01);
     

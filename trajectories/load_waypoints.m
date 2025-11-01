@@ -83,7 +83,7 @@ n_waypoints = length(data.waypoints);
 % Pre-allocate arrays
 waypoints.time = zeros(n_waypoints, 1);
 waypoints.position = zeros(n_waypoints, 3);
-waypoints.yaw = nan(n_waypoints, 1);  % NaN = auto-calculate
+waypoints.yaw = nan(n_waypoints, 1);  % Initialize to Constants.AUTO_YAW (auto-calculate)
 waypoints.labels = cell(n_waypoints, 1);
 
 % Parse each waypoint
@@ -106,15 +106,15 @@ for i = 1:n_waypoints
         waypoints.labels{i} = sprintf('wp_%d', i);
     end
     
-    % Yaw: explicit value or null (NaN for auto)
+    % Yaw: explicit value or null/NaN (auto-calculate from velocity)
     if isfield(wp, 'yaw')
         if isempty(wp.yaw) || (isnumeric(wp.yaw) && isnan(wp.yaw))
-            waypoints.yaw(i) = NaN;  % Auto-calculate
+            waypoints.yaw(i) = Constants.AUTO_YAW;  % Auto-calculate from velocity
         else
-            waypoints.yaw(i) = wp.yaw;
+            waypoints.yaw(i) = wp.yaw;  % Explicit heading
         end
     else
-        waypoints.yaw(i) = NaN;  % Default to auto
+        waypoints.yaw(i) = Constants.AUTO_YAW;  % Default: auto-calculate
     end
 end
 

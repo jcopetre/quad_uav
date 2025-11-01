@@ -106,13 +106,13 @@ function test_yaw_handling()
     wpt = load_waypoints(wpt_file);
     
     % Should have both explicit and auto (NaN) yaw values
-    has_explicit = any(~isnan(wpt.yaw));
-    has_auto = any(isnan(wpt.yaw));
+    has_explicit = any(~isnan(wpt.yaw)); % Constants.AUTO_YAW
+    has_auto = any(isnan(wpt.yaw)); % Constants.AUTO_YAW
     
     assert(has_explicit || has_auto, 'Should have yaw values (explicit or auto)');
     
     % Explicit yaw values should be finite
-    explicit_yaw = wpt.yaw(~isnan(wpt.yaw));
+    explicit_yaw = wpt.yaw(~isnan(wpt.yaw)); % Constants.AUTO_YAW
     if ~isempty(explicit_yaw)
         assert(all(isfinite(explicit_yaw)), 'Explicit yaw values should be finite');
     end

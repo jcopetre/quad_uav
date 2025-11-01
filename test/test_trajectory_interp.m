@@ -33,7 +33,7 @@ function test_simple_trajectory()
     % Create simple waypoint structure
     wpt.time = [0; 2; 4]';
     wpt.position = [0 0 0; 1 0 1; 2 0 1];
-    wpt.yaw = [0; NaN; 0];
+    wpt.yaw = [0; Constants.AUTO_YAW; 0]; 
     
     % Generate trajectory
     trajectory = generate_trajectory_interp(wpt, params);
@@ -104,7 +104,7 @@ function test_waypoint_satisfaction()
                'Waypoint %d position error: %.3f m', i, pos_error);
         
         % Yaw should match (within interpolation tolerance)
-        if ~isnan(wpt.yaw(i))
+        if ~isnan(wpt.yaw(i)) Constants.AUTO_YAW
             yaw_error = abs(trajectory.attitude(idx, 3) - wpt.yaw(i));
             assert(yaw_error < 0.1, ...
                    'Waypoint %d yaw error: %.3f rad', i, yaw_error);
@@ -151,7 +151,7 @@ function test_yaw_auto_calculation()
     % Trajectory moving in +X direction
     wpt.time = [0; 2]';
     wpt.position = [0 0 0; 2 0 0];
-    wpt.yaw = [NaN; NaN];  % Auto-calculate both
+    wpt.yaw = [Constants.AUTO_YAW; Constants.AUTO_YAW];  % Auto-calculate both
     
     trajectory = generate_trajectory_interp(wpt, params, 0.1);
     
@@ -198,7 +198,7 @@ function test_matrix_input()
     % Matrix format: [time, x, y, z, yaw]
     waypoints = [
         0,  0,  0,  0,  0;
-        2,  1,  0,  1,  NaN;
+        2,  1,  0,  1,  Constants.AUTO_YAW;
         4,  2,  0,  1,  0
     ];
     
@@ -253,7 +253,7 @@ function test_first_yaw_nan()
     % First yaw is NaN, should default to 0
     wpt.time = [0; 2; 4]';
     wpt.position = [0 0 0; 1 0 0; 2 0 0];
-    wpt.yaw = [NaN; pi/4; pi/2];
+    wpt.yaw = [Constants.AUTO_YAW; pi/4; pi/2];
     
     trajectory = generate_trajectory_interp(wpt, params, 0.1);
     
@@ -275,7 +275,7 @@ function test_single_defined_yaw()
     % Only first has value (after NaN→0 conversion), rest NaN
     wpt.time = [0; 2]';
     wpt.position = [0 0 0; 2 0 0];
-    wpt.yaw = [0; NaN];  % After conversion: [0; NaN] → only one defined
+    wpt.yaw = [0; Constants.AUTO_YAW];  % After conversion: [0; NaN] → only one defined
     
     trajectory = generate_trajectory_interp(wpt, params, 0.1);
     
@@ -294,7 +294,7 @@ function test_mixed_nan_pattern()
     % Pattern: defined, NaN, defined, NaN, defined
     wpt.time = [0; 1; 2; 3; 4]';
     wpt.position = [0 0 0; 1 0 0; 2 0 0; 3 0 0; 4 0 0];
-    wpt.yaw = [0; NaN; pi/2; NaN; pi];
+    wpt.yaw = [0; Constants.AUTO_YAW; pi/2; Constants.AUTO_YAW; pi];
     
     trajectory = generate_trajectory_interp(wpt, params, 0.1);
     

@@ -126,12 +126,12 @@ end
 trajectory.yaw = zeros(n_points, 1);
 
 % Handle first waypoint if NaN (default to facing north)
-if isnan(wpt_yaw(1))
+if isnan(wpt_yaw(1)) % Check for Constants.AUTO_YAW
     wpt_yaw(1) = 0;
 end
 
 % Find all defined (non-NaN) waypoint indices
-defined_idx = find(~isnan(wpt_yaw));
+defined_idx = find(~isnan(wpt_yaw)); % Not Constants.AUTO_YAW
 
 if ~isempty(defined_idx)
     if length(defined_idx) == 1
