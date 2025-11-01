@@ -1,133 +1,125 @@
-function generate_paper_figures(run_label, timestamp, output_dir, options)
-    % GENERATE_PAPER_FIGURES Creates publication-quality figures from saved simulation data
-    %
-    % USAGE:
-    %   generate_paper_figures(run_label, timestamp)
-    %   generate_paper_figures(run_label, 'latest')
-    %   generate_paper_figures(run_label, timestamp, output_dir)
-    %   generate_paper_figures(run_label, timestamp, output_dir, options)
-    %
-    % INPUTS:
-    %   run_label   - Study identifier (e.g., 'paper_final')
-    %   timestamp   - Specific timestamp or 'latest' to auto-find most recent
-    %   output_dir  - [optional] Custom output directory (default: auto-matched nested dir)
-    %   options     - [optional] Struct with:
-    %                 .close_figures - Close figures after saving (default: true)
-    %                 .verbose       - Print progress messages (default: true)
-    %
-    % OUTPUTS:
-    %   Creates nested directory: ./figures/<run_label>_<timestamp>/
-    %   Saves six figures in that directory:
-    %     - tracking_3d.png
-    %     - tracking_timeseries.png
-    %     - control_inputs.png
-    %     - mc_boxplots.png
-    %     - mc_correlation.png
-    %     - mc_distributions.png
-    %   Plus metrics table: paper_metrics.txt
-    %
-    % EXAMPLE:
-    %   % After running simulate_monte_carlo('simple_square.wpt', 'paper_final');
-    %   generate_paper_figures('paper_final', 'latest');
+function generate_paper_figures(results_dir, options)
+% GENERATE_PAPER_FIGURES Creates publication-quality figures from saved simulation data
+%
+% SYNTAX:
+%   generate_paper_figures(results_dir)
+%   generate_paper_figures(results_dir, options)
+%
+% INPUTS:
+%   results_dir - Path to results directory containing nominal.mat and monte_carlo.mat
+%                 Example: './results/simple_square_10_20251101_143022'
+%   options     - [optional] Struct with:
+%                 .close_figures - Close figures after saving (default: true)
+%                 .verbose       - Print progress messages (default: true)
+%
+% OUTPUTS:
+%   Creates figures subdirectory: <results_dir>/figures/
+%   Saves six figures plus metrics:
+%     - tracking_3d.png
+%     - tracking_timeseries.png
+%     - control_inputs.png
+%     - attitude_dynamics.png
+%     - distributions.png
+%     - boxplots.png
+%     - correlation.png
+%     - paper_metrics.txt
+%
+% EXAMPLE:
+%   % After running simulate_monte_carlo
+%   results_dir = simulate_monte_carlo('simple_square.wpt', 'paper_final');
+%   generate_paper_figures(results_dir);
+%
+%   % With options
+%   opts.close_figures = false;  % Keep figures open
+%   generate_paper_figures(results_dir, opts);
+%
+% See also: simulate_monte_carlo, analyze_monte_carlo_results
+
+% Author: Trey Copeland
+% Date: 2025-11-01 (Refactored for unified directory structure)
+
+    %% Input handling
+    if nargin < 1
+        error('Must provide results_dir');
+    end
     
-%% Input Handling
     if nargin < 2
-        timestamp = 'latest';
-    end
-    
-    % Smart argument detection for 3rd and 4th arguments
-    if nargin == 3
-        % Check if 3rd argument is a struct (options) or string/char (output_dir)
-        if isstruct(output_dir)
-            % User passed options as 3rd argument
-            options = output_dir;
-            output_dir = [];  % Use default
-        else
-            % User passed output_dir as 3rd argument
-            options = struct();
-        end
-    elseif nargin < 3
-        output_dir = [];
-        options = struct();
-    elseif nargin < 4
         options = struct();
     end
     
-    % Set default options
-    if ~isfield(options, 'close_figures'), options.close_figures = true; end
-    if ~isfield(options, 'verbose'), options.verbose = true; end
+    % Set default options using standardized helper
+    defaults = struct(...
+        'close_figures', true, ...
+        'verbose', true ...
+    );
+    options = set_default_options(options, defaults);
     
-    % Find latest timestamp if requested (MUST happen before building paths)
-    if strcmpi(timestamp, 'latest')
-        timestamp = find_latest_timestamp(run_label);
-        if options.verbose
-            fprintf('Auto-detected latest run: %s\n', timestamp);
-        end
-    end
-    
-    % Build paths to data directory
-    run_dir_name = sprintf('%s_%s', run_label, timestamp);
-    results_dir = fullfile('.', 'results', run_dir_name);
-    
-    % Verify directory exists
+    %% Verify results directory exists
     if ~exist(results_dir, 'dir')
-        error('Results directory not found: %s\nAvailable directories:\n%s', ...
-              results_dir, list_available_runs(run_label));
+        error('Results directory not found: %s\nRun simulate_monte_carlo first or check the path.', results_dir);
     end
     
-    % Create matching figures directory
-    if nargin < 3 || isempty(output_dir)
-        figures_dir = fullfile('.', 'figures', run_dir_name);
-    else
-        figures_dir = output_dir;
+    if options.verbose
+        fprintf('Using results directory: %s\n', results_dir);
     end
     
+    %% Create figures subdirectory
+    figures_dir = fullfile(results_dir, 'figures');
     if ~exist(figures_dir, 'dir')
         mkdir(figures_dir);
     end
     
-    fprintf('\n=======================================================\n');
-    fprintf('GENERATING FIGURES: %s\n', run_label);
-    fprintf('=======================================================\n');
-    fprintf('Loading from: %s\n', results_dir);
-    fprintf('Saving to:    %s\n', figures_dir);
-    fprintf('=======================================================\n\n');
+    if options.verbose
+        fprintf('\n=======================================================\n');
+        fprintf('GENERATING FIGURES\n');
+        fprintf('=======================================================\n');
+        fprintf('Loading from: %s\n', results_dir);
+        fprintf('Saving to:    %s\n', figures_dir);
+        fprintf('=======================================================\n\n');
+    end
     
-    %% Load Data
-    fprintf('Loading nominal simulation...\n');
+    %% Load data
+    if options.verbose
+        fprintf('Loading nominal simulation...\n');
+    end
     nominal_file = fullfile(results_dir, 'nominal.mat');
     if ~exist(nominal_file, 'file')
-        error('Nominal data file not found: %s', nominal_file);
+        error('Nominal data file not found: %s\nRun simulate_monte_carlo first.', nominal_file);
     end
     nominal = DataManager.load_results(nominal_file);
     
-    fprintf('Loading Monte Carlo results...\n');
+    if options.verbose
+        fprintf('Loading Monte Carlo results...\n');
+    end
     mc_file = fullfile(results_dir, 'monte_carlo.mat');
     if ~exist(mc_file, 'file')
-        error('Monte Carlo data file not found: %s', mc_file);
+        error('Monte Carlo data file not found: %s\nRun simulate_monte_carlo first.', mc_file);
     end
     % Monte Carlo results have different schema - skip validation and migration
     mc = DataManager.load_results(mc_file, struct('validate', false, 'migrate', false));
     
-    fprintf('Generating figures...')
-    %% Generate Figures
+    %% Generate figures
+    if options.verbose
+        fprintf('Generating tracking figures...\n');
+    end
+    
     fig1 = create_3d_tracking_figure(nominal);
-    save_and_close_figure(fig1, fullfile(figures_dir, 'tracking_3d.png'),...
-        options.close_figures);    
+    save_and_close_figure(fig1, fullfile(figures_dir, 'tracking_3d.png'), options.close_figures);
     
     fig2 = create_tracking_timeseries(nominal);
-    save_and_close_figure(fig2, fullfile(figures_dir, 'tracking_timeseries.png'),...
-        options.close_figures)
+    save_and_close_figure(fig2, fullfile(figures_dir, 'tracking_timeseries.png'), options.close_figures);
     
     fig3 = create_control_inputs_figure(nominal);
-    save_and_close_figure(fig3, fullfile(figures_dir, 'control_inputs.png'),...
-        options.close_figures);
+    save_and_close_figure(fig3, fullfile(figures_dir, 'control_inputs.png'), options.close_figures);
     
     fig4 = create_attitude_dynamics_figure(nominal);
-    save_and_close_figure(fig4, fullfile(figures_dir, 'attitude_dynamics.png'),...
-        options.close_figures);
-
-    fprintf('Running Monte Carlo analysis and generating plots...\n');
+    save_and_close_figure(fig4, fullfile(figures_dir, 'attitude_dynamics.png'), options.close_figures);
+    
+    %% Generate Monte Carlo analysis figures
+    if options.verbose
+        fprintf('Running Monte Carlo analysis and generating plots...\n');
+    end
+    
     analysis_options.plot = true;
     analysis_options.save_plots = true;
     analysis_options.plot_dir = figures_dir;
@@ -136,65 +128,48 @@ function generate_paper_figures(run_label, timestamp, output_dir, options)
     
     analysis = analyze_monte_carlo_results(mc, analysis_options);
     
-    fprintf('Copying MC figures to output directory...\n');
-    % analyze_monte_carlo_results already saved figures to figures_dir
-    % Just confirm they exist
-    mc_figure_files = {'distributions.png', 'boxplots.png', 'correlation.png'};
-    for i = 1:length(mc_figure_files)
-        src = fullfile(figures_dir, mc_figure_files{i});
-        if exist(src, 'file')
-            fprintf('  ✓ %s\n', mc_figure_files{i});
+    % Verify MC figures were created
+    if options.verbose
+        fprintf('Verifying Monte Carlo figures...\n');
+        mc_figure_files = {'distributions.png', 'boxplots.png', 'correlation.png'};
+        for i = 1:length(mc_figure_files)
+            if exist(fullfile(figures_dir, mc_figure_files{i}), 'file')
+                fprintf('  ✓ %s\n', mc_figure_files{i});
+            else
+                fprintf('  ✗ %s (missing)\n', mc_figure_files{i});
+            end
         end
     end
-   
     
-    %% Generate Metrics Table
-    fprintf('\nGenerating paper metrics table...\n');
+    %% Generate paper metrics table
+    if options.verbose
+        fprintf('\nGenerating paper metrics table...\n');
+    end
     metrics_file = fullfile(figures_dir, 'paper_metrics.txt');
     write_paper_metrics(nominal, mc, analysis, metrics_file);
     
     %% Summary
-    fprintf('\n=======================================================\n');
-    fprintf('✅ FIGURES COMPLETE\n');
-    fprintf('=======================================================\n');
-    fprintf('Output directory: %s\n', figures_dir);
+    if options.verbose
+        fprintf('\n=======================================================\n');
+        fprintf('✅ FIGURES COMPLETE\n');
+        fprintf('=======================================================\n');
+        fprintf('All outputs saved to: %s\n', figures_dir);
+        fprintf('\nGenerated files:\n');
+        fprintf('  - tracking_3d.png\n');
+        fprintf('  - tracking_timeseries.png\n');
+        fprintf('  - control_inputs.png\n');
+        fprintf('  - attitude_dynamics.png\n');
+        fprintf('  - distributions.png\n');
+        fprintf('  - boxplots.png\n');
+        fprintf('  - correlation.png\n');
+        fprintf('  - paper_metrics.txt (LaTeX snippets)\n');
+        fprintf('=======================================================\n\n');
+    end
 end
 
 %% ========================================================================
 %% HELPER FUNCTIONS
 %% ========================================================================
-
-function timestamp = find_latest_timestamp(run_label)
-    % Find most recent timestamp for given run_label
-    
-    % Look for directories matching pattern
-    pattern = fullfile('.', 'results', sprintf('%s_*', run_label));
-    dirs = dir(pattern);
-    
-    if isempty(dirs)
-        error('No results found for run_label: %s', run_label);
-    end
-    
-    % Extract timestamps from directory names
-    timestamps = {};
-    for i = 1:length(dirs)
-        if dirs(i).isdir
-            % Pattern: runlabel_TIMESTAMP
-            tokens = regexp(dirs(i).name, sprintf('%s_(\\d{8}_\\d{6})$', run_label), 'tokens');
-            if ~isempty(tokens)
-                timestamps{end+1} = tokens{1}{1}; %#ok<AGROW>
-            end
-        end
-    end
-    
-    if isempty(timestamps)
-        error('Could not extract timestamp from directory names for: %s', run_label);
-    end
-    
-    % Find latest (timestamps are sortable strings in yyyymmdd_HHMMSS format)
-    timestamps = sort(timestamps);
-    timestamp = timestamps{end};
-end
 
 function fig = create_3d_tracking_figure(nominal)
     % Create 3D trajectory tracking visualization
@@ -857,4 +832,41 @@ function save_and_close_figure(fig, filename, close_fig)
     if close_fig
         close(fig);
     end
+end
+
+function results_dir = find_latest_results_dir(run_label)
+    % Find most recent results directory for given run_label
+    
+    % Look for directories matching pattern
+    pattern = fullfile('./results', sprintf('%s_*', run_label));
+    dirs = dir(pattern);
+    
+    if isempty(dirs)
+        error('No results found for run_label: %s\nRun simulate_monte_carlo first.', run_label);
+    end
+    
+    % Extract timestamps from directory names
+    timestamps = {};
+    dir_names = {};
+    for i = 1:length(dirs)
+        if dirs(i).isdir && ~strcmp(dirs(i).name, '.') && ~strcmp(dirs(i).name, '..')
+            % Pattern: runlabel_YYYYMMDD_HHMMSS
+            tokens = regexp(dirs(i).name, sprintf('%s_(\\d{8}_\\d{6})$', run_label), 'tokens');
+            if ~isempty(tokens)
+                timestamps{end+1} = tokens{1}{1}; %#ok<AGROW>
+                dir_names{end+1} = dirs(i).name; %#ok<AGROW>
+            end
+        end
+    end
+    
+    if isempty(timestamps)
+        error('No valid results directories found for: %s\nExpected format: %s_YYYYMMDD_HHMMSS', ...
+              run_label, run_label);
+    end
+    
+    % Sort timestamps and get latest
+    [~, idx] = max(cellfun(@(x) datenum(x, 'yyyymmdd_HHMMSS'), timestamps));
+    latest_dir = dir_names{idx};
+    
+    results_dir = fullfile('./results', latest_dir);
 end

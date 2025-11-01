@@ -40,7 +40,7 @@ switch lower(RUN_TYPE)
         fprintf('Running test study with default settings...\n');
         
         mc_options = struct();
-        mc_options.N_trials = 50;     
+        mc_options.N_trials = 2000;     
         mc_options.parallel = true;   % Use all CPU cores
         mc_options.verbose = false;
         fprintf('Running pilot study with default settings...\n');
