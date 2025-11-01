@@ -13,8 +13,8 @@ function u = compute_lqr_control(x, x_ref, params)
 %   params - Parameter structure containing:
 %            .K       - LQR feedback gain matrix (4x12)
 %            .u_hover - Nominal hover control (4x1)
-%            .u_max   - Maximum control limits (4x1) [optional]
-%            .u_min   - Minimum control limits (4x1) [optional]
+%            .u_max   - Maximum control limits (4x1)
+%            .u_min   - Minimum control limits (4x1)
 %
 % OUTPUTS:
 %   u - Control vector (4x1): [F, tau_phi, tau_theta, tau_psi]'
@@ -24,9 +24,9 @@ function u = compute_lqr_control(x, x_ref, params)
 %   u = u_hover - K*e                (LQR feedback)
 %   u = saturate(u, u_min, u_max)    (actuator limits)
 %
-% DEFAULT SATURATION LIMITS:
-%   Thrust:  [0, 2*m*g] N
-%   Torques: [-0.1, +0.1] N·m
+% NOTES:
+%   Saturation limits (u_max, u_min) must be defined in params structure.
+%   These are set by quadrotor_linear_6dof() as vehicle properties.
 %
 % EXAMPLE:
 %   params = quadrotor_linear_6dof();
@@ -36,14 +36,13 @@ function u = compute_lqr_control(x, x_ref, params)
 %
 % See also: quadrotor_linear_6dof, quadrotor_closed_loop_dynamics
 
-% Author: Trey Copeland, jcopetre@gmail.com
-% Date: 2025-10-09
-
 %% Validate inputs
 assert(length(x) == 12, 'State vector must be 12x1');
 assert(length(x_ref) == 12, 'Reference state must be 12x1');
 assert(isfield(params, 'K'), 'params must contain K matrix');
 assert(isfield(params, 'u_hover'), 'params must contain u_hover');
+assert(isfield(params, 'u_max'), 'params must contain u_max (set in quadrotor_linear_6dof)');
+assert(isfield(params, 'u_min'), 'params must contain u_min (set in quadrotor_linear_6dof)');
 
 %% Compute tracking error
 e = x - x_ref;
@@ -54,25 +53,6 @@ e = x - x_ref;
 u = params.u_hover - params.K * e;
 
 %% Apply saturation limits
-% Default limits if not provided
-if ~isfield(params, 'u_max') || isempty(params.u_max)
-    % Thrust: 0 to 2x hover thrust (can't pull, max 2g acceleration)
-    % Torques: symmetric limits based on typical quadrotor
-    params.u_max = [2 * params.m * params.g;  % Max thrust
-                    0.1;                       % Max roll torque
-                    0.1;                       % Max pitch torque
-                    0.1];                      % Max yaw torque
-end
-
-if ~isfield(params, 'u_min') || isempty(params.u_min)
-    % Thrust: non-negative (can't pull)
-    % Torques: negative of max
-    params.u_min = [0;      % Min thrust
-                    -0.1;   % Min roll torque
-                    -0.1;   % Min pitch torque
-                    -0.1];  % Min yaw torque
-end
-
 % Saturate each control input
 u = min(max(u, params.u_min), params.u_max);
 

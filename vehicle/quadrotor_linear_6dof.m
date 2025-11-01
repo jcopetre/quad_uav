@@ -23,6 +23,7 @@ function params = quadrotor_linear_6dof(Q, R, verbose)
 %            .S                             - Solution to Riccati equation
 %            .poles                         - Closed-loop eigenvalues
 %            .u_hover                       - Nominal hover control (4x1)
+%            .u_max, .u_min                 - Actuator saturation limits (4x1)
 %
 % LINEARIZATION:
 %   Model linearized around hover equilibrium:
@@ -155,9 +156,35 @@ function params = quadrotor_linear_6dof(Q, R, verbose)
     params.u_hover = [params.m * params.g; 0; 0; 0];
     
     %% Actuator Saturation Limits
-    % Hardware constraints independent of vehicle mass
-    params.u_max = [2 * params.m * params.g; 0.1; 0.1; 0.1];
-    params.u_min = [0; -0.1; -0.1; -0.1];
+    % These limits represent physical hardware constraints and are used by
+    % compute_lqr_control() to saturate control commands.
+    %
+    % DESIGN RATIONALE:
+    %   Thrust: [0, 2*m*g] N
+    %     - Lower: 0 N (motors can't pull, only push)
+    %     - Upper: 2x hover thrust (allows up to 2g vertical acceleration)
+    %
+    %   Torques: [-0.1, +0.1] N·m
+    %     - Based on typical 500g quadrotor with 0.25m arms
+    %     - Provides ~15 deg/s² angular acceleration
+    %     - Adjust for different vehicle classes:
+    %         * Micro (<100g):     ±0.01 N·m
+    %         * Small (500g):      ±0.1 N·m
+    %         * Medium (1-2kg):    ±0.3 N·m
+    %         * Large (>5kg):      ±1.0 N·m
+    %
+    % NOTE: These are the single source of truth for saturation limits.
+    %       Do not define defaults elsewhere.
+    
+    params.u_max = [2 * params.m * params.g;  % Max thrust (N)
+                    0.1;                       % Max roll torque (N·m)
+                    0.1;                       % Max pitch torque (N·m)
+                    0.1];                      % Max yaw torque (N·m)
+    
+    params.u_min = [0;      % Min thrust (N) - can't pull
+                    -0.1;   % Min roll torque (N·m)
+                    -0.1;   % Min pitch torque (N·m)
+                    -0.1];  % Min yaw torque (N·m)
 
     %% Display summary
     if verbose
@@ -168,6 +195,9 @@ function params = quadrotor_linear_6dof(Q, R, verbose)
         fprintf('  Arm length:  %.3f m\n', params.L);
         fprintf('  Inertia:     Ixx=%.4f, Iyy=%.4f, Izz=%.4f kg·m²\n', ...
                 params.Ixx, params.Iyy, params.Izz);
+        fprintf('\nActuator Limits:\n');
+        fprintf('  Thrust:      [%.1f, %.1f] N\n', params.u_min(1), params.u_max(1));
+        fprintf('  Torques:     [%.2f, %.2f] N·m\n', params.u_min(2), params.u_max(2));
         fprintf('\nLQR Controller:\n');
         fprintf('  Feedback gain K: [4x12]\n');
         fprintf('  Closed-loop poles (real part): %.2f to %.2f\n', ...
