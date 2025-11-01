@@ -1,12 +1,12 @@
-function metrics = compute_performance_metrics(t, x, trajectory, params, u_log)
+function metrics = compute_metrics(t, x, trajectory, params, u_log)
 % COMPUTE_PERFORMANCE_METRICS - Standardized performance evaluation
 %
 % Computes comprehensive performance metrics for trajectory tracking.
 % Used for both single simulations and Monte Carlo analysis.
 %
 % SYNTAX:
-%   metrics = compute_performance_metrics(t, x, trajectory, params)
-%   metrics = compute_performance_metrics(t, x, trajectory, params, u_log)
+%   metrics = compute_metrics(t, x, trajectory, params)
+%   metrics = compute_metrics(t, x, trajectory, params, u_log)
 %
 % INPUTS:
 %   t          - Time vector (Nx1) [s]
@@ -25,7 +25,7 @@ function metrics = compute_performance_metrics(t, x, trajectory, params, u_log)
 %
 % EXAMPLE:
 %   [t, x] = ode45(...);
-%   metrics = compute_performance_metrics(t, x, trajectory, params);
+%   metrics = compute_metrics(t, x, trajectory, params);
 %   fprintf('RMSE: %.4f m\n', metrics.tracking.rmse_position);
 
 % Author: Trey Copeland

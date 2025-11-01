@@ -120,10 +120,10 @@ for i = 1:length(scales)
     options = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
     
     try
-        [t, x, u_log] = simulate_quadrotor(x0, tspan, params, traj, options);
+        [t, x, u_log] = ode_simulate(x0, tspan, params, traj, options);
         
         % Compute metrics
-        metrics = compute_performance_metrics(t, x, traj, params, u_log);
+        metrics = compute_metrics(t, x, traj, params, u_log);
         
         % Store results
         results(i).scale = scale;

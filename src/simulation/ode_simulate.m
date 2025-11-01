@@ -1,12 +1,12 @@
-function [t, x, u_log] = simulate_quadrotor(x0, tspan, params, trajectory, options)
+function [t, x, u_log] = ode_simulate(x0, tspan, params, trajectory, options)
 % SIMULATE_QUADROTOR - Run closed-loop simulation with control logging
 %
 % Simulates quadrotor trajectory tracking using LQR control and nonlinear
 % 6DOF dynamics. Returns state history and control input history.
 %
 % SYNTAX:
-%   [t, x, u_log] = simulate_quadrotor(x0, tspan, params, trajectory)
-%   [t, x, u_log] = simulate_quadrotor(x0, tspan, params, trajectory, options)
+%   [t, x, u_log] = ode_simulate(x0, tspan, params, trajectory)
+%   [t, x, u_log] = ode_simulate(x0, tspan, params, trajectory, options)
 %
 % INPUTS:
 %   x0         - Initial state vector (12x1)
@@ -32,10 +32,10 @@ function [t, x, u_log] = simulate_quadrotor(x0, tspan, params, trajectory, optio
 %   x0 = zeros(12, 1);
 %   tspan = [0, traj.time(end)];
 %   
-%   [t, x, u_log] = simulate_quadrotor(x0, tspan, params, traj);
+%   [t, x, u_log] = ode_simulate(x0, tspan, params, traj);
 %   
 %   % Analyze results
-%   metrics = compute_performance_metrics(t, x, traj, params, u_log);
+%   metrics = compute_metrics(t, x, traj, params, u_log);
 %
 % See also: ode45, quadrotor_closed_loop_dynamics, compute_performance_metrics
 

@@ -9,8 +9,26 @@
 %   2. Generate figures from saved data (do many times, takes seconds)
 %   3. Iterate on figure appearance without regenerating data
 
-clear; clc; close all;
-init_project();
+
+%% Smart initialization
+stack = dbstack;
+called_from_function = length(stack) > 1;
+
+if called_from_function
+    % Called via run_study() - skip clear
+    clc; close all;
+else
+    % Called directly - full reset
+    clear variables; clc; close all;
+    init_project();
+
+    % Change to project root so relative paths work correctly
+    project_root = fileparts(which('init_project'));
+    if ~strcmp(pwd, project_root)
+        cd(project_root);
+        fprintf('Working directory changed to project root: %s\n', project_root);
+    end
+end
 
 %% ========================================================================
 %% CONFIGURATION
@@ -126,7 +144,7 @@ fig_options.close_figures = true;  % Close figures after saving
 fig_options.verbose = true;
 
 % Generate figures - uses results_dir directly!
-generate_paper_figures(results_dir, fig_options);
+generate_paper_outputs(results_dir, fig_options);
 
 fprintf('\n');
 
@@ -167,7 +185,7 @@ end
 
 mc_file = fullfile(results_dir, 'monte_carlo.mat');
 if exist(mc_file, 'file')
-    mc = DataManager.load_results(mc_file, struct('validate', false, 'migrate', false));
+    mc = DataManager.load_monte_carlo(mc_file, struct('validate', false, 'migrate', false));
     fprintf('\nMonte Carlo Results:\n');
     fprintf('  Success Rate:   %.1f%%\n', mc.statistics.success_rate);
     if isfield(mc.statistics, 'metrics')
@@ -192,7 +210,7 @@ fprintf('✓ Figures created\n');
 fprintf('✓ Metrics computed\n');
 fprintf('\n');
 fprintf('To regenerate figures with different styling:\n');
-fprintf('  >> generate_paper_figures(''%s'')\n', results_dir);
+fprintf('  >> generate_paper_outputs(''%s'')\n', results_dir);
 fprintf('\n');
 fprintf('To view figures:\n');
 fprintf('  >> cd %s\n', figures_dir);

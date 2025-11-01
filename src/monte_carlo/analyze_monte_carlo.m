@@ -1,13 +1,13 @@
-function analysis = analyze_monte_carlo_results(mc_results, analysis_options)
+function analysis = analyze_monte_carlo(mc_results, analysis_options)
 % ANALYZE_MONTE_CARLO_RESULTS - Statistical analysis and visualization of MC data
 %
 % Performs comprehensive statistical analysis of Monte Carlo simulation results
 % including parameter sensitivity, failure analysis, and performance distributions.
 %
 % SYNTAX:
-%   analyze_monte_carlo_results(mc_results)
-%   analyze_monte_carlo_results(mc_results, analysis_options)
-%   analysis = analyze_monte_carlo_results(...)
+%   analyze_monte_carlo(mc_results)
+%   analyze_monte_carlo(mc_results, analysis_options)
+%   analysis = analyze_monte_carlo(...)
 %
 % INPUTS:
 %   mc_results       - Results structure from run_monte_carlo()
@@ -41,12 +41,12 @@ function analysis = analyze_monte_carlo_results(mc_results, analysis_options)
 %   mc_results = run_monte_carlo('basic_maneuver.wpt', perturb_config, mc_options);
 %   
 %   % Analyze with plots
-%   analysis = analyze_monte_carlo_results(mc_results);
+%   analysis = analyze_monte_carlo(mc_results);
 %   
 %   % Custom analysis
 %   opts.save_plots = true;
 %   opts.plot_dir = './mc_results/figures/';
-%   analysis = analyze_monte_carlo_results(mc_results, opts);
+%   analysis = analyze_monte_carlo(mc_results, opts);
 %
 % See also: run_monte_carlo, simulate_quadrotor_pure
 

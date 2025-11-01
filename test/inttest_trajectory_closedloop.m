@@ -113,21 +113,21 @@ options = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
 
 fprintf('  Simulating with interpolation trajectory... ');
 tic;
-[t_interp, x_interp, u_interp] = simulate_quadrotor(x0_interp, tspan, params, traj_interp, options);
+[t_interp, x_interp, u_interp] = ode_simulate(x0_interp, tspan, params, traj_interp, options);
 t_interp_sim = toc;
 fprintf('%.3f s (%d steps)\n', t_interp_sim, length(t_interp));
 
 fprintf('  Simulating with minimum snap trajectory... ');
 tic;
-[t_minsnap, x_minsnap, u_minsnap] = simulate_quadrotor(x0_minsnap, tspan, params, traj_minsnap, options);
+[t_minsnap, x_minsnap, u_minsnap] = ode_simulate(x0_minsnap, tspan, params, traj_minsnap, options);
 t_minsnap_sim = toc;
 fprintf('%.3f s (%d steps)\n\n', t_minsnap_sim, length(t_minsnap));
 
 %% Compute Performance Metrics
 fprintf('Step 5: Computing performance metrics...\n');
 
-metrics_interp = compute_performance_metrics(t_interp, x_interp, traj_interp, params, u_interp);
-metrics_minsnap = compute_performance_metrics(t_minsnap, x_minsnap, traj_minsnap, params, u_minsnap);
+metrics_interp = compute_metrics(t_interp, x_interp, traj_interp, params, u_interp);
+metrics_minsnap = compute_metrics(t_minsnap, x_minsnap, traj_minsnap, params, u_minsnap);
 
 fprintf('  ✓ Metrics computed for both methods\n\n');
 

@@ -67,7 +67,7 @@ function mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_option
 %   mc_results = run_monte_carlo('basic_maneuver.wpt', perturb_config, mc_options);
 %   
 %   % Analyze results
-%   analyze_monte_carlo_results(mc_results);
+%   analyze_monte_carlo(mc_results);
 %
 % NOTES:
 %   - Failed trials (e.g., unstable) are logged but don't stop execution
@@ -138,7 +138,7 @@ function mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_option
     opts_nominal.params = params_nominal;
     
     try
-        results_nominal = simulate_quadrotor_pure(trajectory_file, [], [], [], opts_nominal);
+        results_nominal = simulate_trajectory(trajectory_file, [], [], [], opts_nominal);
         nominal_success = true;
     catch ME
         warning('Nominal simulation failed: %s', ME.message);
@@ -360,7 +360,7 @@ function trial = run_single_trial(trial_num, trajectory_file, params_perturbed, 
     
     try
         % Run simulation
-        results = simulate_quadrotor_pure(trajectory_file, [], [], [], opts_sim);
+        results = simulate_trajectory(trajectory_file, [], [], [], opts_sim);
         
         % Store results
         trial.metrics = results.metrics;

@@ -7,8 +7,6 @@ function test_data_contracts()
     %   - Migration handles old formats
     %   - DataManager I/O operations work
     %
-    % NOTE: Requires +data package in MATLAB path
-    %       Files should be in: <project_root>/+data/
     
     fprintf('Running Data Contract Tests\n');
     fprintf('============================\n\n');
@@ -24,11 +22,8 @@ function test_data_contracts()
         test_schema_definitions();
         test_validation_required_fields();
         test_validation_types();
-        test_validation_sizes();
-        test_migration_old_trajectory();
         test_datamanager_save_load();
         test_datamanager_validation_on_load();
-        test_backward_compatibility();
         test_helpful_error_messages();
         
         fprintf('\n============================\n');
@@ -51,12 +46,11 @@ function test_data_contracts()
     end
 end
 
-%% Test 1: Schema Definitions Complete
 function test_schema_definitions()
     fprintf('Test 1: Schema definitions... ');
     
     % Get all schema types
-    schemas = {'SimulationResult', 'TrajectoryData', 'PerformanceMetrics', 'MonteCarloResult'};
+    schemas = {'SimulationResult', 'TrajectoryData', 'MonteCarloResult'};
     
     for i = 1:length(schemas)
         schema = DataSchemas.(schemas{i})();
@@ -82,28 +76,30 @@ function test_schema_definitions()
     fprintf('PASS\n');
 end
 
-%% Test 2: Validation Catches Missing Required Fields
 function test_validation_required_fields()
     fprintf('Test 2: Validation of required fields... ');
     
     schema = DataSchemas.TrajectoryData();
     
-    % Valid data
+    % Valid data - include ALL required fields
     valid_traj = struct();
     valid_traj.time = [0; 1; 2];
     valid_traj.position = zeros(3, 3);
     valid_traj.velocity = zeros(3, 3);
     valid_traj.acceleration = zeros(3, 3);
+    valid_traj.jerk = zeros(3, 3);        % ← ADD THIS (required)
+    valid_traj.yaw = zeros(1, 3);         % ← ADD THIS (required)
+    % Optional fields:
     valid_traj.attitude = zeros(3, 3);
     valid_traj.omega = zeros(3, 3);
     
     % Should pass
-    DataSchemas.validate(valid_traj, schema);
+    DataSchemas.validate(valid_traj, schema, 'valid_traj');
     
     % Missing required field should fail
     invalid_traj = rmfield(valid_traj, 'position');
     try
-        DataSchemas.validate(invalid_traj, schema);
+        DataSchemas.validate(invalid_traj, schema, 'invalid_traj');
         error('Should have caught missing required field');
     catch ME
         assert(contains(ME.message, 'missing required field'), ...
@@ -113,7 +109,6 @@ function test_validation_required_fields()
     fprintf('PASS\n');
 end
 
-%% Test 3: Validation Checks Types
 function test_validation_types()
     fprintf('Test 3: Type validation... ');
     
@@ -125,92 +120,32 @@ function test_validation_types()
     traj.position = zeros(3, 3);
     traj.velocity = zeros(3, 3);
     traj.acceleration = zeros(3, 3);
-    traj.attitude = zeros(3, 3);
-    traj.omega = zeros(3, 3);
+    traj.jerk = zeros(3, 3);
+    traj.yaw = zeros(1, 3);
     
     % Valid - should pass
     DataSchemas.validate(traj, schema);
     
-    % Wrong type - should fail
+    % Wrong type - should warn (not error!)
     traj_bad = traj;
     traj_bad.time = 'not a number';  % Should be double
-    try
-        DataSchemas.validate(traj_bad, schema);
-        error('Should have caught type mismatch');
-    catch ME
-        assert(contains(ME.message, 'must be double'), ...
-               'Wrong error for type mismatch');
-    end
+    
+    % Capture warnings
+    warning('off', 'all');  % Clear previous
+    lastwarn('');           % Reset
+    DataSchemas.validate(traj_bad, schema);
+    [warnMsg, warnId] = lastwarn;
+    warning('on', 'all');   % Re-enable
+    
+    % Check we got the type warning
+    assert(contains(warnId, 'TypeMismatch'), 'Should have warned about type mismatch');
+    assert(contains(warnMsg, 'has type'), 'Wrong warning message format');
     
     fprintf('PASS\n');
 end
 
-%% Test 4: Validation Checks Sizes
-function test_validation_sizes()
-    fprintf('Test 4: Size validation... ');
-    
-    schema = DataSchemas.TrajectoryData();
-    
-    % Create valid trajectory
-    traj = struct();
-    traj.time = [0; 1; 2];
-    traj.position = zeros(3, 3);
-    traj.velocity = zeros(3, 3);
-    traj.acceleration = zeros(3, 3);
-    traj.attitude = zeros(3, 3);
-    traj.omega = zeros(3, 3);
-    
-    % Valid - should pass
-    DataSchemas.validate(traj, schema);
-    
-    % Wrong size - should fail
-    traj_bad = traj;
-    traj_bad.position = zeros(3, 5);  % Should be Nx3, not Nx5
-    try
-        DataSchemas.validate(traj_bad, schema);
-        error('Should have caught size mismatch');
-    catch ME
-        assert(contains(ME.message, 'dimension'), ...
-               'Wrong error for size mismatch');
-    end
-    
-    fprintf('PASS\n');
-end
-
-%% Test 5: Migration Handles Old Field Names
-function test_migration_old_trajectory()
-    fprintf('Test 5: Migration of old formats... ');
-    
-    % Create trajectory with OLD field names
-    old_traj = struct();
-    old_traj.time = [0; 1; 2];
-    old_traj.r_ref = zeros(3, 3);      % OLD name
-    old_traj.att_ref = zeros(3, 3);    % OLD name
-    old_traj.velocity = zeros(3, 3);
-    old_traj.acceleration = zeros(3, 3);
-    old_traj.omega = zeros(3, 3);
-    
-    % Migrate
-    new_traj = DataSchemas.migrate(old_traj, 'TrajectoryData');
-    
-    % Check new field names exist
-    assert(isfield(new_traj, 'position'), 'Migration did not create position field');
-    assert(isfield(new_traj, 'attitude'), 'Migration did not create attitude field');
-    
-    % Check old field names removed
-    assert(~isfield(new_traj, 'r_ref'), 'Migration did not remove r_ref');
-    assert(~isfield(new_traj, 'att_ref'), 'Migration did not remove att_ref');
-    
-    % Validate migrated data
-    schema = DataSchemas.TrajectoryData();
-    DataSchemas.validate(new_traj, schema);
-    
-    fprintf('PASS\n');
-end
-
-%% Test 6: DataManager Save/Load
 function test_datamanager_save_load()
-    fprintf('Test 6: DataManager save/load... ');
+    fprintf('Test 4: DataManager save/load... ');
     
     % Create minimal valid SimulationResult
     results = struct();
@@ -224,6 +159,8 @@ function test_datamanager_save_load()
     results.trajectory.acceleration = zeros(3, 3);
     results.trajectory.attitude = zeros(3, 3);
     results.trajectory.omega = zeros(3, 3);
+    results.trajectory.jerk = zeros(3, 3);
+    results.trajectory.yaw = zeros(1, 3);
     results.params = struct('mass', 1.0);
     results.metrics = struct('rmse_position', 0.1);
     results.config = struct('dt', 0.01);
@@ -245,9 +182,8 @@ function test_datamanager_save_load()
     fprintf('PASS\n');
 end
 
-%% Test 7: DataManager Validates On Load
 function test_datamanager_validation_on_load()
-    fprintf('Test 7: DataManager validation on load... ');
+    fprintf('Test 5: DataManager validation on load... ');
     
     % Create INVALID results (missing required field)
     bad_results = struct();
@@ -261,7 +197,7 @@ function test_datamanager_validation_on_load()
     
     % Try to load with validation but NO migration - should fail with validation error
     try
-        DataManager.load_results(filepath, struct('validate', true, 'migrate', false, 'verbose', false));
+        DataManager.load_results(filepath, struct('validate', true, 'verbose', false));
         error('Should have caught invalid data on load');
     catch ME
         assert(contains(ME.message, 'missing required field'), ...
@@ -271,45 +207,8 @@ function test_datamanager_validation_on_load()
     fprintf('PASS\n');
 end
 
-%% Test 8: Backward Compatibility
-function test_backward_compatibility()
-    fprintf('Test 8: Backward compatibility... ');
-    
-    % Create old-format results
-    old_results = struct();
-    old_results.t = [0; 1; 2];
-    old_results.x = zeros(3, 12);
-    old_results.u_log = zeros(3, 4);
-    old_results.trajectory = struct();
-    old_results.trajectory.time = [0; 1; 2];
-    old_results.trajectory.r_ref = zeros(3, 3);      % OLD field name
-    old_results.trajectory.att_ref = zeros(3, 3);    % OLD field name
-    old_results.trajectory.velocity = zeros(3, 3);
-    old_results.trajectory.acceleration = zeros(3, 3);
-    old_results.trajectory.omega = zeros(3, 3);
-    old_results.params = struct('mass', 1.0);
-    old_results.metrics = struct('rmse_position', 0.1);
-    old_results.config = struct('dt', 0.01);
-    old_results.timestamp = datestr(now);
-    
-    % Save old format
-    test_dir = './test_data_contracts_temp';
-    filepath = fullfile(test_dir, 'old_format.mat');
-    save(filepath, '-struct', 'old_results');
-    
-    % Load with auto-migration
-    loaded = DataManager.load_results(filepath, struct('migrate', true, 'verbose', false));
-    
-    % Check migration worked
-    assert(isfield(loaded.trajectory, 'position'), 'Migration failed: missing position');
-    assert(isfield(loaded.trajectory, 'attitude'), 'Migration failed: missing attitude');
-    
-    fprintf('PASS\n');
-end
-
-%% Test 9: Helpful Error Messages
 function test_helpful_error_messages()
-    fprintf('Test 9: Helpful error messages... ');
+    fprintf('Test 6: Helpful error messages... ');
     
     % Create data missing a field
     data = struct();

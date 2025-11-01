@@ -288,7 +288,7 @@ function test_analysis_basic()
     analysis_options.correlation = true;
     
     % Suppress analysis output too
-    evalc('analysis = analyze_monte_carlo_results(mc_results, analysis_options);');
+    evalc('analysis = analyze_monte_carlo(mc_results, analysis_options);');
     
     % Verify analysis structure
     assert(isstruct(analysis), 'Analysis must return structure');

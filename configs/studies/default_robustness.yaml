@@ -1,0 +1,22 @@
+# Default robustness study configuration
+# This is a placeholder for future config-driven execution
+
+study_type: monte_carlo
+trajectory: simple_square.wpt
+vehicle: iris_quadrotor
+controller: lqr_default
+
+monte_carlo:
+  trials: 500
+  parallel: true
+  seed: 42
+  
+  uncertainties:
+    mass: {type: normal, std: 0.05}
+    inertia: {type: normal, std: 0.075}
+    arm_length: {type: normal, std: 0.005}
+
+outputs:
+  generate_figures: true
+  generate_metrics: true
+  save_data: true

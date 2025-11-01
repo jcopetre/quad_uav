@@ -1,15 +1,15 @@
-function results = simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
+function results = simulate_trajectory(trajectory_file, Q, R, x0, options)
 % SIMULATE_QUADROTOR_PURE - Main simulation script for quadrotor trajectory tracking
 %
 % Production-quality simulation framework for 6DOF quadrotor trajectory tracking
 % using LQR control and nonlinear dynamics. Supports batch processing and Monte Carlo.
 %
 % SYNTAX:
-%   simulate_quadrotor_pure(trajectory_file)
-%   simulate_quadrotor_pure(trajectory_file, Q, R)
-%   simulate_quadrotor_pure(trajectory_file, Q, R, x0)
-%   simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
-%   results = simulate_quadrotor_pure(...)
+%   simulate_trajectory(trajectory_file)
+%   simulate_trajectory(trajectory_file, Q, R)
+%   simulate_trajectory(trajectory_file, Q, R, x0)
+%   simulate_trajectory(trajectory_file, Q, R, x0, options)
+%   results = simulate_trajectory(...)
 %
 % INPUTS:
 %   trajectory_file - Filename in ./trajectories/ (e.g., 'basic_maneuver.wpt')
@@ -37,22 +37,22 @@ function results = simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
 %
 % EXAMPLES:
 %   % Simple: run with defaults, show plots
-%   simulate_quadrotor_pure('basic_maneuver.wpt');
+%   simulate_trajectory('basic_maneuver.wpt');
 %
 %   % Custom tuning, capture results
 %   Q_aggressive = diag([200 200 200 20 20 5 20 20 20 2 2 1]);
-%   results = simulate_quadrotor_pure('hover_test.wpt', Q_aggressive);
+%   results = simulate_trajectory('hover_test.wpt', Q_aggressive);
 %
 %   % Start tilted with initial velocity
 %   x0 = zeros(12,1);
 %   x0(4) = deg2rad(5);   % 5° roll
 %   x0(7) = 0.5;          % 0.5 m/s forward velocity
-%   simulate_quadrotor_pure('basic_maneuver.wpt', [], [], x0);
+%   simulate_trajectory('basic_maneuver.wpt', [], [], x0);
 %
 %   % Batch mode for Monte Carlo
 %   opts.verbose = false;
 %   opts.plot = false;
-%   results = simulate_quadrotor_pure('basic_maneuver.wpt', [], [], [], opts);
+%   results = simulate_trajectory('basic_maneuver.wpt', [], [], [], opts);
 %
 % See also: quadrotor_linear_6dof, simulate_quadrotor, compute_performance_metrics
 
@@ -222,7 +222,7 @@ function results = simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
     ode_options = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
     
     tic;
-    [t, x, u_log] = simulate_quadrotor(x0_full, tspan, params, trajectory, ode_options);
+    [t, x, u_log] = ode_simulate(x0_full, tspan, params, trajectory, ode_options);
     sim_time = toc;
     
     if verbose

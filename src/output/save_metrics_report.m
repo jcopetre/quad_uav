@@ -5,7 +5,7 @@ function save_metrics_report(nominal_results, mc_results, output_file)
     %   save_metrics_report(nominal_results, mc_results, output_file)
     %
     % INPUTS:
-    %   nominal_results - Struct from simulate_quadrotor_pure()
+    %   nominal_results - Struct from simulate_trajectory()
     %   mc_results      - Struct from run_monte_carlo()
     %   output_file     - Full path to output text file (e.g., './results/study_1/metrics.txt')
     %

@@ -57,7 +57,7 @@ tspan = [0, trajectory.time(end)];
 options = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
 
 tic;
-[t, x, u_log] = simulate_quadrotor(x0, tspan, params, trajectory);
+[t, x, u_log] = ode_simulate(x0, tspan, params, trajectory);
 sim_time = toc;
 
 fprintf('  Simulation complete: %.3f seconds (%.0f time steps)\n', ...
@@ -147,7 +147,7 @@ sgtitle('Quadrotor LQR Control - Quick Test', 'FontSize', 16, 'FontWeight', 'bol
 
 %% Step 7: Output Performance Metrics
 fprintf('Step 7: Generating performance metrics...\n');
-metrics = compute_performance_metrics(t, x, trajectory, params, u_log);
+metrics = compute_metrics(t, x, trajectory, params, u_log);
 
 fprintf('\n========================================\n');
 fprintf('SIMULATION COMPLETE!\n');

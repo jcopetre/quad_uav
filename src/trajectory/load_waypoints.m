@@ -48,14 +48,26 @@ function waypoints = load_waypoints(filename)
 
 %% Validate input
 assert(ischar(filename) || isstring(filename), 'Filename must be a string');
-assert(exist(filename, 'file') == 2, 'File not found: %s', filename);
+
+% Smart file finding: try as-is, then try trajectories/ subdirectory
+if exist(filename, 'file') == 2
+    % File found as-is (full path or relative path that exists)
+    filepath = filename;
+elseif exist(fullfile('trajectories', filename), 'file') == 2
+    % File found in trajectories/ subdirectory
+    filepath = fullfile('trajectories', filename);
+else
+    % File not found anywhere
+    error('Waypoint file not found: %s\nTried:\n  1. %s\n  2. %s', ...
+          filename, filename, fullfile('trajectories', filename));
+end
 
 %% Read and parse JSON file
 try
     % Read file as text
-    fid = fopen(filename, 'r');
+    fid = fopen(filepath, 'r');
     if fid == -1
-        error('Cannot open file: %s', filename);
+        error('Cannot open file: %s', filepath);
     end
     json_text = fread(fid, '*char')';
     fclose(fid);
@@ -63,7 +75,7 @@ try
     % Parse JSON
     data = jsondecode(json_text);
 catch ME
-    error('Failed to parse JSON file: %s\nError: %s', filename, ME.message);
+    error('Failed to parse JSON file: %s\nError: %s', filepath, ME.message);
 end
 
 %% Validate JSON structure
@@ -131,7 +143,7 @@ if all(isnan(waypoints.yaw))
 end
 
 %% Display summary
-fprintf('Loaded waypoint file: %s\n', filename);
+fprintf('Loaded waypoint file: %s\n', filepath);
 if isfield(waypoints.metadata, 'name')
     fprintf('  Name: %s\n', waypoints.metadata.name);
 end

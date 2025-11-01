@@ -39,7 +39,7 @@ function results_dir = simulate_monte_carlo(trajectory_file, run_label, perturb_
 %   results_dir = simulate_monte_carlo('simple_square.wpt', 'paper_final');
 %   
 %   % Later, generate figures
-%   generate_paper_figures(results_dir);
+%   generate_paper_outputs(results_dir);
 %
 % See also: run_monte_carlo, generate_paper_figures
 
@@ -94,19 +94,21 @@ function results_dir = simulate_monte_carlo(trajectory_file, run_label, perturb_
     
     %% Run Monte Carlo analysis
     mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_options);
-    
+
     %% Save nominal simulation
     if mc_options.verbose
         fprintf('Saving nominal simulation...\n');
     end
     nominal = mc_results.nominal.results;
-    save(fullfile(results_dir, 'nominal.mat'), 'nominal', '-v7.3');
+    DataManager.save_results(nominal, 'nominal', results_dir, ...
+       struct('timestamp', false, 'validate', true, 'verbose', mc_options.verbose));
     
     %% Save Monte Carlo results
     if mc_options.verbose
         fprintf('Saving Monte Carlo results...\n');
     end
-    save(fullfile(results_dir, 'monte_carlo.mat'), 'mc_results', '-v7.3');
+    DataManager.save_monte_carlo(mc_results, results_dir, ...
+        struct('validate', true, 'verbose', mc_options.verbose));
     
     %% Generate metrics file
     if mc_options.verbose
@@ -124,7 +126,7 @@ function results_dir = simulate_monte_carlo(trajectory_file, run_label, perturb_
         fprintf('Results saved to: %s\n', results_dir);
         fprintf('\nNext steps:\n');
         fprintf('  1. Review metrics: edit %s\n', metrics_file);
-        fprintf('  2. Generate figures: generate_paper_figures(''%s'')\n', results_dir);
+        fprintf('  2. Generate figures: generate_paper_outputs(''%s'')\n', results_dir);
         fprintf('================================================================\n\n');
     end
 end

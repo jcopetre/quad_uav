@@ -52,7 +52,7 @@ tspan = [0, trajectory_gen.time(end)];
 options = odeset('RelTol', 1e-6, 'AbsTol', 1e-8);
 
 tic;
-[t, x, u_log] = simulate_quadrotor(x0, tspan, params, trajectory_gen, options);
+[t, x, u_log] = ode_simulate(x0, tspan, params, trajectory_gen, options);
 sim_time = toc;
 
 fprintf('  Simulation complete: %.3f seconds (%.0f time steps)\n', ...
@@ -62,7 +62,7 @@ fprintf('  Simulation complete: %.3f seconds (%.0f time steps)\n', ...
 fprintf('Step 5: Computing tracking error...\n');
 
 % Compute metrics
-metrics = compute_performance_metrics(t, x, trajectory_gen, params, u_log);
+metrics = compute_metrics(t, x, trajectory_gen, params, u_log);
 
 fprintf('  Position RMSE: %.4f m\n', metrics.tracking.rmse_position);
 

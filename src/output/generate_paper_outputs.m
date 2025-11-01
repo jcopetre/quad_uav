@@ -1,9 +1,9 @@
-function generate_paper_figures(results_dir, options)
+function generate_paper_outputs(results_dir, options)
 % GENERATE_PAPER_FIGURES Creates publication-quality figures from saved simulation data
 %
 % SYNTAX:
-%   generate_paper_figures(results_dir)
-%   generate_paper_figures(results_dir, options)
+%   generate_paper_outputs(results_dir)
+%   generate_paper_outputs(results_dir, options)
 %
 % INPUTS:
 %   results_dir - Path to results directory containing nominal.mat and monte_carlo.mat
@@ -27,11 +27,11 @@ function generate_paper_figures(results_dir, options)
 % EXAMPLE:
 %   % After running simulate_monte_carlo
 %   results_dir = simulate_monte_carlo('simple_square.wpt', 'paper_final');
-%   generate_paper_figures(results_dir);
+%   generate_paper_outputs(results_dir);
 %
 %   % With options
 %   opts.close_figures = false;  % Keep figures open
-%   generate_paper_figures(results_dir, opts);
+%   generate_paper_outputs(results_dir, opts);
 %
 % See also: simulate_monte_carlo, analyze_monte_carlo_results
 
@@ -96,7 +96,7 @@ function generate_paper_figures(results_dir, options)
         error('Monte Carlo data file not found: %s\nRun simulate_monte_carlo first.', mc_file);
     end
     % Monte Carlo results have different schema - skip validation and migration
-    mc = DataManager.load_results(mc_file, struct('validate', false, 'migrate', false));
+    mc = DataManager.load_monte_carlo(mc_file, struct('verbose', options.verbose));
     
     %% Generate figures
     if options.verbose
@@ -126,7 +126,7 @@ function generate_paper_figures(results_dir, options)
     analysis_options.verbose = false;
     analysis_options.close_figures = options.close_figures;
     
-    analysis = analyze_monte_carlo_results(mc, analysis_options);
+    analysis = analyze_monte_carlo(mc, analysis_options);
     
     % Verify MC figures were created
     if options.verbose

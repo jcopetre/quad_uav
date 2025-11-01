@@ -54,7 +54,7 @@ mc_results = run_monte_carlo(TRAJECTORY, perturb_config, mc_options);
 
 %% Analyze Results
 fprintf('Analyzing results and generating plots...\n\n');
-analysis = analyze_monte_carlo_results(mc_results);
+analysis = analyze_monte_carlo(mc_results);
 
 %% Display Key Findings
 fprintf('\n===========================================\n');

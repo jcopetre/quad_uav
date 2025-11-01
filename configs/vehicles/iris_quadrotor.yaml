@@ -1,0 +1,11 @@
+# Iris quadrotor vehicle parameters
+# Placeholder for future config-driven vehicle definition
+
+name: Iris Quadrotor
+mass: 0.5  # kg
+inertia:
+  Ixx: 0.01  # kg·m²
+  Iyy: 0.01
+  Izz: 0.02
+arm_length: 0.25  # m
+gravity: 9.81  # m/s²
