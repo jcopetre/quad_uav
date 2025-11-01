@@ -20,6 +20,7 @@ A complete simulation framework for trajectory tracking control of a 6 degree-of
 │
 ├── trajectories/
 │   ├── load_waypoints.m                 [Waypoint file loader (JSON)]
+│   ├── generate_trajectory_auto.m       [Automatic method selection (RECOMMENDED)]
 │   ├── generate_trajectory_interp.m     [MAKIMA interpolation-based generation]
 │   ├── generate_trajectory_minsnap.m    [Minimum snap optimization]
 │   └── *.wpt                            [Waypoint definition files (JSON)]
@@ -64,7 +65,9 @@ utilities/simulate_quadrotor_pure.m (Main Orchestrator)
     ├──> quadrotor_linear_6dof() → LQR controller design
     │
     ├──> load_waypoints() → Parse .wpt file
-    │    └──> generate_trajectory_*() → Smooth trajectory
+    │    └──> generate_trajectory_auto() → Auto-select generation method
+    │         ├──> generate_trajectory_interp() (if segments < 3s)
+    │         └──> generate_trajectory_minsnap() (if segments ≥ 3s)
     │
     └──> simulate_quadrotor() → Run ODE45
          │
@@ -217,12 +220,13 @@ run_tests
 ### Individual Tests
 
 ```matlab
-test_linear_6dof                % Vehicle model tests (7 tests)
-test_dynamics_pure              % Nonlinear dynamics tests (7 tests)
-test_control_loop               % Control loop tests (8 tests)
-test_waypoints                  % Waypoint loader tests (8 tests)
-test_trajectory_interp          % MAKIMA interpolation trajectory tests (11 tests)
-test_trajectory_minsnap         % Minimum snap trajectory tests (20 tests)
+test_linear_6dof                % Vehicle model tests
+test_dynamics_pure              % Nonlinear dynamics tests
+test_control_loop               % Control loop tests
+test_waypoints                  % Waypoint loader tests
+test_trajectory_auto            % Automatic selector tests
+test_trajectory_interp          % MAKIMA interpolation trajectory tests
+test_trajectory_minsnap         % Minimum snap trajectory tests
 inttest_trajectory_closedloop   % Compare trajectory methods with LQR
 inttest_minsnap_visualization   % Visual validation of minimum snap
 quick_test_sim                  % Fast end-to-end test
@@ -231,11 +235,37 @@ find_angle_limit                % Empirical controller limit analysis
 
 **Test Coverage**: 61+ unit tests across all core functionality. See individual test files for detailed descriptions.
 
-## 📚 Trajectory Generation Methods
+## 📊 Trajectory Generation Methods
 
-### Method 1: MAKIMA Interpolation (`generate_trajectory_interp.m`)
+### Recommended: Automatic Method Selection
 
-**Best for**: Real-time applications, rapid prototyping, general-purpose use
+**Use `generate_trajectory_auto.m` for most applications** - it intelligently selects the best trajectory generation method based on waypoint timing:
+
+```matlab
+% Automatic selection (recommended)
+wpt = load_waypoints('basic_maneuver.wpt');
+params = quadrotor_linear_6dof();
+trajectory = generate_trajectory_auto(wpt, params);
+fprintf('Selected method: %s\n', trajectory.method);
+```
+
+**Selection Logic** (based on empirical testing):
+- **Short segments (< 3s)**: Uses MAKIMA interpolation (avoids excessive accelerations)
+- **Long segments (≥ 3s)**: Uses minimum snap optimization (achieves optimal smoothness)
+
+The automatic selector analyzes all segment durations and conservatively selects interpolation if ANY segment is too short, preventing the generation of unsafe trajectories with excessive pitch angles (>15°).
+
+**Why this matters**: Minimum snap doesn't directly constrain acceleration. For 0.5s segments, it can generate 30 m/s² accelerations requiring 30° pitch - far exceeding the linearization validity region!
+
+---
+
+### Advanced: Manual Method Selection
+
+For specialized use cases, you can explicitly choose a method:
+
+#### Method 1: MAKIMA Interpolation (`generate_trajectory_interp.m`)
+
+**Best for**: Real-time applications, rapid prototyping, short time segments
 
 **Characteristics**:
 * Fast generation (< 0.1s for typical trajectories)
@@ -243,14 +273,19 @@ find_angle_limit                % Empirical controller limit analysis
 * Non-zero velocities at waypoints (natural motion)
 * Reduced oscillations vs. spline methods
 * Robust to unequally-spaced waypoints
+* **Safe for short segments** (doesn't produce excessive accelerations)
 
-**When to use**:
-* Real-time trajectory planning
+**When to manually select**:
+* Real-time trajectory planning with tight timing
 * Rapid iteration during development
-* When computation time is critical
-* When acceptable smoothness is sufficient
+* When you know segments are short (< 3s)
 
-### Method 2: Minimum Snap Optimization (`generate_trajectory_minsnap.m`)
+```matlab
+% Force interpolation method
+trajectory = generate_trajectory_interp(wpt, params, 0.01);
+```
+
+#### Method 2: Minimum Snap Optimization (`generate_trajectory_minsnap.m`)
 
 **Best for**: Offline planning, aggressive maneuvers, optimal performance
 
@@ -262,25 +297,34 @@ find_angle_limit                % Empirical controller limit analysis
 * Follows Mellinger & Kumar (2011) formulation
 * Requires Optimization Toolbox for `quadprog`
 
-**When to use**:
-* Offline trajectory optimization
+**When to manually select**:
+* Offline trajectory optimization with long segments (≥ 3s)
 * Aggressive racing or aerobatic maneuvers
 * When control smoothness is critical
-* When optimality matters more than speed
-
-### Comparison
+* When optimality matters more than computation time
 
 ```matlab
-% Generate with both methods
-traj_interp = generate_trajectory_interp(wpt, params, 0.01);
-traj_minsnap = generate_trajectory_minsnap(wpt, params, 0.01);
+% Force minimum snap method
+trajectory = generate_trajectory_minsnap(wpt, params, 0.01);
+```
 
-% Run integration test to compare
+#### Comparison
+
+```matlab
+% Compare both methods
+wpt = load_waypoints('basic_maneuver.wpt');
+params = quadrotor_linear_6dof();
+
+traj_auto = generate_trajectory_auto(wpt, params, 0.01);     % Recommended
+traj_interp = generate_trajectory_interp(wpt, params, 0.01); % Force method
+traj_minsnap = generate_trajectory_minsnap(wpt, params, 0.01); % Force method
+
+% Run integration test for detailed comparison
 cd test
 inttest_trajectory_closedloop
 ```
 
-See `test/inttest_trajectory_closedloop.m` for detailed performance comparison metrics.
+See `test/inttest_trajectory_closedloop.m` for detailed performance comparison metrics and `test/test_trajectory_auto.m` for automatic selector validation.
 
 ## 🛠️ Customization
 
@@ -486,6 +530,7 @@ end
 | `utilities/generate_paper_figures.m` | Paper figure generation |
 | `quadrotor_linear_6dof.m` | Vehicle model and LQR design |
 | `load_waypoints.m` | JSON waypoint file parser |
+| `generate_trajectory_auto.m` | Automatic trajectory method selection (recommended) |
 | `generate_trajectory_interp.m` | MAKIMA interpolation-based trajectory |
 | `generate_trajectory_minsnap.m` | Minimum snap optimization using `quadprog` |
 | `compute_lqr_control.m` | LQR control law with saturation |
