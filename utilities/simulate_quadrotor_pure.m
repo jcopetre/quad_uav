@@ -74,10 +74,11 @@ function results = simulate_quadrotor_pure(trajectory_file, Q, R, x0, options)
         options = struct();
     end
     
-    if ~isfield(options, 'verbose'),      options.verbose = true; end
-    if ~isfield(options, 'save_results'), options.save_results = true; end
-    if ~isfield(options, 'plot'),         options.plot = (nargout == 0); end  % Auto: plot if no output
-    if ~isfield(options, 'dt'),           options.dt = 0.01; end
+    defaults.verbose = true;
+    defaults.save_results = true;
+    defaults.plot = (nargout == 0);
+    defaults.dt = 0.01;
+    options = set_default_options(options, defaults);
     
     % Convenience flag for output
     verbose = options.verbose;

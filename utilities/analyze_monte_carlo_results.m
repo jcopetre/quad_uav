@@ -58,15 +58,16 @@ function analysis = analyze_monte_carlo_results(mc_results, analysis_options)
         analysis_options = struct();
     end
     
-    % Set defaults
-    if ~isfield(analysis_options, 'plot'),        analysis_options.plot = true; end
-    if ~isfield(analysis_options, 'save_plots'),  analysis_options.save_plots = false; end
-    if ~isfield(analysis_options, 'plot_dir'),    analysis_options.plot_dir = './figures/'; end
-    if ~isfield(analysis_options, 'correlation'), analysis_options.correlation = true; end
-    if ~isfield(analysis_options, 'sensitivity'), analysis_options.sensitivity = true; end
-    if ~isfield(analysis_options, 'percentiles'), analysis_options.percentiles = [5 25 50 75 95]; end
-    if ~isfield(analysis_options, 'verbose'),     analysis_options.verbose = true; end
-    if ~isfield(analysis_options, 'close_figures'), analysis_options.close_figures = false; end
+    % Define analysis defaults
+    defaults.plot = true;
+    defaults.save_plots = false;
+    defaults.plot_dir = './figures/';
+    defaults.correlation = true;
+    defaults.sensitivity = true;
+    defaults.percentiles = [5 25 50 75 95];
+    defaults.verbose = true;
+    
+    analysis_options = set_default_options(analysis_options, defaults);
 
     %% Header
     if analysis_options.verbose

@@ -85,13 +85,15 @@ function mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_option
         mc_options = struct();
     end
     
-    % Default MC options
-    if ~isfield(mc_options, 'N_trials'),     mc_options.N_trials = 100; end
-    if ~isfield(mc_options, 'seed'),         mc_options.seed = 42; end
-    if ~isfield(mc_options, 'parallel'),     mc_options.parallel = false; end
-    if ~isfield(mc_options, 'verbose'),      mc_options.verbose = true; end
-    if ~isfield(mc_options, 'save_file'),    mc_options.save_file = ''; end
-    if ~isfield(mc_options, 'save_all_trials'), mc_options.save_all_trials = false; end
+    % Define default MC options
+    defaults.N_trials = 100;
+    defaults.seed = 42;
+    defaults.parallel = false;
+    defaults.verbose = true;
+    defaults.save_file = '';
+    defaults.save_all_trials = false;
+    
+    mc_options = set_default_options(mc_options, defaults);
     
     % Validate inputs
     assert(ischar(trajectory_file) || isstring(trajectory_file), ...
