@@ -1,9 +1,4 @@
-% EXAMPLE_PAPER_WORKFLOW - Demonstrates complete paper figure workflow
-%
-% This script shows the recommended workflow for generating figures for your
-% ME590 paper. It separates data generation (expensive) from figure generation
-% (fast), allowing you to iterate on visualizations without rerunning 4-hour
-% Monte Carlo simulations.
+% Demonstrates several complete workflows
 %
 % WORKFLOW:
 %   1. Run this script to generate data (do once, takes hours)
