@@ -155,7 +155,7 @@ function perturb_config = get_default_perturbations()
 end
 
 function write_metrics_summary(mc_results, nominal, filename)
-    % Write human-readable metrics summary
+    % Write human-readable metrics summary with complete configuration
     
     fid = fopen(filename, 'w');
     if fid == -1
@@ -163,34 +163,154 @@ function write_metrics_summary(mc_results, nominal, filename)
     end
     
     try
-        fprintf(fid, '================================================================\n');
-        fprintf(fid, 'MONTE CARLO ROBUSTNESS STUDY - METRICS SUMMARY\n');
-        fprintf(fid, '================================================================\n');
+        fprintf(fid, '=================================================================\n');
+        fprintf(fid, 'MONTE CARLO ROBUSTNESS ANALYSIS - COMPREHENSIVE REPORT\n');
+        fprintf(fid, '=================================================================\n');
         fprintf(fid, 'Generated: %s\n', datestr(now));
-        fprintf(fid, 'Trajectory: %s\n', mc_results.config.trajectory_file);
-        fprintf(fid, '================================================================\n\n');
+        fprintf(fid, '=================================================================\n\n');
+        
+        %% ============================================================
+        %% CONFIGURATION SECTION (For Reproducibility)
+        %% ============================================================
+        fprintf(fid, 'CONFIGURATION (For Reproducibility)\n');
+        fprintf(fid, '-----------------------------------------------------------------\n\n');
+        
+        % Trajectory information
+        fprintf(fid, 'Trajectory:\n');
+        fprintf(fid, '  File:              %s\n', mc_results.config.trajectory_file);
+        fprintf(fid, '  Duration:          %.2f s\n', nominal.trajectory.time(end));
+        fprintf(fid, '  Time Step (dt):    %.4f s\n', mean(diff(nominal.trajectory.time)));
+        
+        % Trajectory generation method
+        if isfield(nominal.trajectory, 'method')
+            fprintf(fid, '  Generation Method: %s\n', nominal.trajectory.method);
+            if isfield(nominal.trajectory, 'method_reason')
+                fprintf(fid, '    Reason:          %s\n', nominal.trajectory.method_reason);
+            end
+            if isfield(nominal.trajectory, 'selection_criteria')
+                sc = nominal.trajectory.selection_criteria;
+                if isfield(sc, 'min_segment')
+                    fprintf(fid, '    Min Segment:     %.2f s\n', sc.min_segment);
+                end
+                if isfield(sc, 'threshold')
+                    fprintf(fid, '    Threshold:       %.2f s\n', sc.threshold);
+                end
+            end
+        end
+        fprintf(fid, '\n');
+        
+        % Vehicle parameters
+        params = nominal.params;
+        fprintf(fid, 'Vehicle Parameters:\n');
+        fprintf(fid, '  Mass (m):          %.4f kg\n', params.m);
+        fprintf(fid, '  Arm Length (L):    %.4f m\n', params.L);
+        fprintf(fid, '  Inertia:           Ixx=%.6f, Iyy=%.6f, Izz=%.6f kg·m²\n', ...
+                params.Ixx, params.Iyy, params.Izz);
+        fprintf(fid, '  Gravity:           %.2f m/s²\n', params.g);
+        fprintf(fid, '\n');
+        
+        % Actuator limits
+        fprintf(fid, 'Actuator Limits:\n');
+        fprintf(fid, '  Thrust:            [%.2f, %.2f] N\n', params.u_min(1), params.u_max(1));
+        fprintf(fid, '  Torques:           [%.3f, %.3f] N·m\n', params.u_min(2), params.u_max(2));
+        fprintf(fid, '\n');
+        
+        % Controller design
+        fprintf(fid, 'LQR Controller Design:\n');
+        Q_diag = diag(params.Q);
+        fprintf(fid, '  State Weights (Q):\n');
+        fprintf(fid, '    Position:        [%.1f, %.1f, %.1f]\n', Q_diag(1), Q_diag(2), Q_diag(3));
+        fprintf(fid, '    Attitude:        [%.1f, %.1f, %.1f]\n', Q_diag(4), Q_diag(5), Q_diag(6));
+        fprintf(fid, '    Velocity:        [%.1f, %.1f, %.1f]\n', Q_diag(7), Q_diag(8), Q_diag(9));
+        fprintf(fid, '    Angular Rate:    [%.1f, %.1f, %.1f]\n', Q_diag(10), Q_diag(11), Q_diag(12));
+        
+        R_diag = diag(params.R);
+        fprintf(fid, '  Control Weights (R): [%.2f, %.2f, %.2f, %.2f]\n', ...
+                R_diag(1), R_diag(2), R_diag(3), R_diag(4));
+        
+        fprintf(fid, '  Hover Thrust:      %.4f N\n', params.u_hover(1));
+        fprintf(fid, '  Closed-Loop Poles:\n');
+        fprintf(fid, '    Range:           [%.2f, %.2f] (real part)\n', ...
+                min(real(params.poles)), max(real(params.poles)));
+        
+        % Stability check (no ternary)
+        if all(real(params.poles) < 0)
+            fprintf(fid, '    All Stable:      YES\n');
+        else
+            fprintf(fid, '    All Stable:      NO\n');
+        end
+        fprintf(fid, '\n');
+        
+        % Monte Carlo configuration
+        fprintf(fid, 'Monte Carlo Configuration:\n');
+        fprintf(fid, '  Trials:            %d\n', mc_results.config.mc_options.N_trials);
+        fprintf(fid, '  Random Seed:       %d\n', mc_results.config.mc_options.seed);
+        
+        % Parallel check (no ternary)
+        if mc_results.config.mc_options.parallel
+            fprintf(fid, '  Parallel:          YES\n');
+        else
+            fprintf(fid, '  Parallel:          NO\n');
+        end
+        fprintf(fid, '\n');
+        
+        % Parameter perturbations
+        fprintf(fid, 'Parameter Perturbations:\n');
+        perturb = mc_results.config.perturb_config.params;
+        for i = 1:size(perturb, 1)
+            param_name = perturb{i, 1};
+            dist_type = perturb{i, 2};
+            param1 = perturb{i, 3};
+            param2 = perturb{i, 4};
+            
+            switch lower(dist_type)
+                case 'normal'
+                    pct = 100 * param2 / param1;
+                    fprintf(fid, '  %-6s: %s(μ=%.4f, σ=%.4f) → ±%.1f%% std\n', ...
+                            param_name, dist_type, param1, param2, pct);
+                case 'uniform'
+                    fprintf(fid, '  %-6s: %s[%.4f, %.4f]\n', ...
+                            param_name, dist_type, param1, param2);
+                case 'fixed'
+                    fprintf(fid, '  %-6s: %s = %.4f\n', ...
+                            param_name, dist_type, param1);
+            end
+        end
+        fprintf(fid, '\n');
+        fprintf(fid, '=================================================================\n\n');
+        
+        %% ============================================================
+        %% RESULTS SECTION
+        %% ============================================================
         
         % Overall statistics
         fprintf(fid, 'OVERALL STATISTICS\n');
-        fprintf(fid, '------------------\n');
-        fprintf(fid, 'Total trials:     %d\n', mc_results.statistics.n_trials);
-        fprintf(fid, 'Successful:       %d (%.1f%%)\n', ...
+        fprintf(fid, '-----------------------------------------------------------------\n');
+        fprintf(fid, 'Total trials:      %d\n', mc_results.statistics.n_trials);
+        fprintf(fid, 'Successful:        %d (%.1f%%)\n', ...
                 mc_results.statistics.n_success, mc_results.statistics.success_rate);
-        fprintf(fid, 'Failed:           %d (%.1f%%)\n\n', ...
+        fprintf(fid, 'Failed:            %d (%.1f%%)\n\n', ...
                 mc_results.statistics.n_failed, ...
                 100 * mc_results.statistics.n_failed / mc_results.statistics.n_trials);
-        fprintf(fid, 'Elapsed time:     %.2f seconds\n', mc_results.elapsed_time);
-        fprintf(fid, 'Time per trial:   %.3f seconds\n\n', ...
+        fprintf(fid, 'Elapsed time:      %.2f seconds\n', mc_results.elapsed_time);
+        fprintf(fid, 'Time per trial:    %.3f seconds\n\n', ...
                 mc_results.elapsed_time / mc_results.statistics.n_trials);
         
         % Nominal performance
-        fprintf(fid, 'NOMINAL PERFORMANCE\n');
-        fprintf(fid, '-------------------\n');
+        fprintf(fid, 'NOMINAL PERFORMANCE (Baseline)\n');
+        fprintf(fid, '-----------------------------------------------------------------\n');
         if isfield(nominal, 'metrics') && isfield(nominal.metrics, 'tracking')
-            fprintf(fid, 'Position RMSE:    %.4f m\n', nominal.metrics.tracking.rmse_position);
-            fprintf(fid, 'Attitude RMSE:    %.4f rad (%.2f deg)\n', ...
+            fprintf(fid, 'Position RMSE:     %.4f m\n', nominal.metrics.tracking.rmse_position);
+            fprintf(fid, 'Attitude RMSE:     %.4f rad (%.2f deg)\n', ...
                     nominal.metrics.tracking.rmse_attitude, ...
                     rad2deg(nominal.metrics.tracking.rmse_attitude));
+            
+            if isfield(nominal.metrics.tracking, 'max_position_error')
+                fprintf(fid, 'Max Position Err:  %.4f m\n', nominal.metrics.tracking.max_position_error);
+            end
+            if isfield(nominal.metrics, 'control') && isfield(nominal.metrics.control, 'total_effort')
+                fprintf(fid, 'Control Effort:    %.2f\n', nominal.metrics.control.total_effort);
+            end
         end
         fprintf(fid, '\n');
         
@@ -198,31 +318,42 @@ function write_metrics_summary(mc_results, nominal, filename)
         if isfield(mc_results.statistics, 'metrics')
             m = mc_results.statistics.metrics;
             fprintf(fid, 'MONTE CARLO PERFORMANCE (Successful Trials)\n');
-            fprintf(fid, '-------------------------------------------\n');
-            fprintf(fid, 'Position RMSE:    %.4f ± %.4f m (mean ± std)\n', ...
+            fprintf(fid, '-----------------------------------------------------------------\n');
+            fprintf(fid, 'Position RMSE:     %.4f ± %.4f m (mean ± std)\n', ...
                     m.rmse_position_mean, m.rmse_position_std);
-            fprintf(fid, 'Attitude RMSE:    %.4f ± %.4f rad (%.2f ± %.2f deg)\n', ...
+            fprintf(fid, 'Attitude RMSE:     %.4f ± %.4f rad (%.2f ± %.2f deg)\n', ...
                     m.rmse_attitude_mean, m.rmse_attitude_std, ...
                     rad2deg(m.rmse_attitude_mean), rad2deg(m.rmse_attitude_std));
             
             fprintf(fid, '\nPercentiles:\n');
-            fprintf(fid, '  5th:  %.4f m (position), %.2f deg (attitude)\n', ...
+            fprintf(fid, '  5th:             %.4f m (position), %.2f deg (attitude)\n', ...
                     m.rmse_position_percentiles(1), rad2deg(m.rmse_attitude_percentiles(1)));
-            fprintf(fid, '  25th: %.4f m (position), %.2f deg (attitude)\n', ...
+            fprintf(fid, '  25th:            %.4f m (position), %.2f deg (attitude)\n', ...
                     m.rmse_position_percentiles(2), rad2deg(m.rmse_attitude_percentiles(2)));
-            fprintf(fid, '  75th: %.4f m (position), %.2f deg (attitude)\n', ...
+            fprintf(fid, '  50th (median):   %.4f m (position), %.2f deg (attitude)\n', ...
+                    m.rmse_position_median, rad2deg(m.rmse_attitude_median));
+            fprintf(fid, '  75th:            %.4f m (position), %.2f deg (attitude)\n', ...
                     m.rmse_position_percentiles(3), rad2deg(m.rmse_attitude_percentiles(3)));
-            fprintf(fid, '  95th: %.4f m (position), %.2f deg (attitude)\n', ...
+            fprintf(fid, '  95th:            %.4f m (position), %.2f deg (attitude)\n', ...
                     m.rmse_position_percentiles(4), rad2deg(m.rmse_attitude_percentiles(4)));
         end
         
-        fprintf(fid, '\n================================================================\n');
-        fprintf(fid, 'END OF SUMMARY\n');
-        fprintf(fid, '================================================================\n');
+        fprintf(fid, '\n=================================================================\n');
+        fprintf(fid, 'END OF REPORT\n');
+        fprintf(fid, '=================================================================\n');
         
         fclose(fid);
     catch ME
         fclose(fid);
         rethrow(ME);
+    end
+end
+
+function str = ternary(condition, true_val, false_val)
+    % Simple ternary operator helper
+    if condition
+        str = true_val;
+    else
+        str = false_val;
     end
 end

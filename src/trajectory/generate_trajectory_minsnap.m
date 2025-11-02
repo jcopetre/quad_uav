@@ -159,6 +159,10 @@ trajectory.attitude = [trajectory.roll, trajectory.pitch, trajectory.yaw];
 %% Compute angular velocity from Euler rates
 trajectory.omega = compute_angular_velocity(trajectory, dt);
 
+% Store method information for reproducibility
+trajectory.method = 'minimum_snap';
+trajectory.method_reason = 'User requested minimum snap directly';
+
 %% Display summary
 fprintf('\nTrajectory generation complete:\n');
 fprintf('  Total computation time: %.3f s\n', t_x + t_y + t_z + t_eval + t_yaw + t_att);

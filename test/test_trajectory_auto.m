@@ -32,7 +32,7 @@ wpt2.yaw = [0; 0; 0];
 
 traj2 = generate_trajectory_auto(wpt2, params, 0.01);
 
-assert(strcmp(traj2.method, 'minsnap'), ...
+assert(strcmp(traj2.method, 'minimum_snap'), ...
        'Should select minsnap for 4s segments');
 assert(traj2.selection_criteria.min_segment == 4.0, ...
        'Should detect 4s minimum segment');
@@ -64,7 +64,7 @@ wpt4.yaw = [0; 0; 0];
 
 traj4 = generate_trajectory_auto(wpt4, params, 0.01);
 
-assert(strcmp(traj4.method, 'minsnap'), ...
+assert(strcmp(traj4.method, 'minimum_snap'), ...
        'Should select minsnap at threshold (3s ≥ 3s)');
 
 fprintf('PASS\n');

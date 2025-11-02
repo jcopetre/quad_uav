@@ -180,7 +180,15 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
     % Load waypoints if filename was provided
     if is_filename
         % Construct full path to trajectory file
-        trajectory_path = fullfile('./trajectories', trajectory_file);
+        % Find project root (where init_project.m lives)
+        init_path = which('init_project');
+        if isempty(init_path)
+            error('Cannot find project root. Run init_project() first.');
+        end
+        project_root = fileparts(init_path);
+        
+        % Build absolute path to trajectory
+        trajectory_path = fullfile(project_root, 'trajectories', trajectory_file);
         
         % Validate file exists
         if ~exist(trajectory_path, 'file')

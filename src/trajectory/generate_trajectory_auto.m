@@ -75,24 +75,19 @@ function trajectory = generate_trajectory_auto(waypoints, params, dt)
     %% Make decision
     if min_segment < SAFE_SEGMENT_THRESHOLD
         % Use interpolation (safer for short segments)
-        method = 'interpolation';
-        reason = sprintf('Short segment detected: %.2fs < %.2fs threshold', ...
-                        min_segment, SAFE_SEGMENT_THRESHOLD);
-        
+        method_reason = sprintf('Auto-selected: Short segment detected (%.2fs < %.2fs threshold)', ...
+                           min_segment, SAFE_SEGMENT_THRESHOLD);
         fprintf('Auto-selecting: INTERPOLATION trajectory generation\n');
-        fprintf('  Reason: %s\n', reason);
+        fprintf('  Reason: %s\n', method_reason);
         fprintf('  Segment durations: min=%.2fs, avg=%.2fs, max=%.2fs\n', ...
                 min_segment, avg_segment, max_segment);
         fprintf('  (Minimum snap would produce excessive accelerations)\n');
         
         trajectory = generate_trajectory_interp(waypoints, params, dt);
-        
     else
         % Use minimum snap (optimal for long segments)
-        method = 'minsnap';
-        reason = sprintf('All segments sufficient: min=%.2fs ≥ %.2fs threshold', ...
-                        min_segment, SAFE_SEGMENT_THRESHOLD);
-        
+        method_reason = sprintf('Auto-selected: All segments >= %.2fs threshold', SAFE_SEGMENT_THRESHOLD);
+        fprintf('  Reason: %s\n', method_reason);
         fprintf('Auto-selecting: MINIMUM SNAP trajectory generation\n');
         fprintf('  Segment durations: min=%.2fs, avg=%.2fs, max=%.2fs\n', ...
                 min_segment, avg_segment, max_segment);
@@ -102,11 +97,13 @@ function trajectory = generate_trajectory_auto(waypoints, params, dt)
     end
     
     %% Add metadata about selection
-    trajectory.method = method;
-    trajectory.method_reason = reason;
-    trajectory.selection_criteria.min_segment = min_segment;
-    trajectory.selection_criteria.avg_segment = avg_segment;
-    trajectory.selection_criteria.threshold = SAFE_SEGMENT_THRESHOLD;
+    trajectory.method_reason = method_reason;
+    trajectory.selection_criteria = struct(...
+        'min_segment', min_segment, ...
+        'avg_segment', mean(segment_durations), ...
+        'max_segment', max(segment_durations), ...
+        'threshold', SAFE_SEGMENT_THRESHOLD, ...
+        'auto_selected', true);
     
     %% Post-generation validation
     max_acc = max(vecnorm(trajectory.acceleration, 2, 2));

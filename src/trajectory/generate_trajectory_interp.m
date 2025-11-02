@@ -230,6 +230,10 @@ yaw_rate = max(-max_yaw_rate, min(max_yaw_rate, yaw_rate));
 trajectory.omega(:, 3) = yaw_rate;  % r (yaw rate only)
 % p and q remain zero - let controller handle roll/pitch changes
 
+% Store method information for reproducibility
+trajectory.method = 'interpolation';
+trajectory.method_reason = 'User requested interpolation directly';
+
 %% Display summary
 fprintf('Generated trajectory:\n');
 fprintf('  Duration: %.2f seconds\n', t_end - t_start);

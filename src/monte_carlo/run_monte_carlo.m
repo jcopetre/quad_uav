@@ -350,7 +350,7 @@ function trial = run_single_trial(trial_num, trajectory_file, params_perturbed, 
     % Run a single Monte Carlo trial
     
     % Use perturbed physical parameters with nominal controller
-    opts_sim.params = params_perturbed;
+    opts_sim.params_plant = params_perturbed;
     opts_sim.params.K = params_nominal.K;        % Keep nominal controller
     opts_sim.params.u_hover = params_nominal.u_hover;
     
