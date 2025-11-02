@@ -74,8 +74,18 @@ function metrics = compute_metrics(t, x, trajectory, params, u_log)
     if nargin >= 5 && ~isempty(u_log)
         assert(size(u_log, 1) == n, 'Control log length must match state history');
         
-        % Total control effort (integral of squared control)
+        % Total control effort: ∫(F² + τ²) dt
+        % Units: N²·s + (N·m)²·s (mixed - NOT physically meaningful)
+        % Note: Dominated by thrust term (>99%), used for trending only
         metrics.control.total_effort = trapz(t, sum(u_log.^2, 2));
+        metrics.control.total_effort_units = 'N²·s + (N·m)²·s (mixed)';
+        metrics.control.total_effort_note = 'For comparison only; dominated by thrust';
+        
+        % Add RMS values (physically meaningful)
+        metrics.control.rms_thrust = rms(u_log(:,1));
+        metrics.control.rms_roll_torque = rms(u_log(:,2));
+        metrics.control.rms_pitch_torque = rms(u_log(:,3));
+        metrics.control.rms_yaw_torque = rms(u_log(:,4));
         
         % Average control magnitudes
         metrics.control.mean_thrust = mean(u_log(:, 1));

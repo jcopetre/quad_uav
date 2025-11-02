@@ -347,36 +347,40 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
         fprintf('\n');
     end
     
-    %% ========================================================================
+%% ========================================================================
     %  STEP 9: SAVE RESULTS
     %  ========================================================================
     
     if options.save_results
-        % Create output directory if needed
+        % Create output directory
         output_dir = options.output_dir;
         if ~exist(output_dir, 'dir')
             mkdir(output_dir);
         end
         
-        % Generate filename label from trajectory
+        % Generate label
         if is_filename
-            [~, base_name, ~] = fileparts(trajectory_file);
-            label = base_name;
+            [~, label, ~] = fileparts(trajectory_file);
         else
             if isfield(wpt, 'metadata') && isfield(wpt.metadata, 'name')
-                % Use metadata name if available
                 label = matlab.lang.makeValidName(wpt.metadata.name);
             else
-                % Generic label for programmatic waypoints
                 label = 'programmatic_trajectory';
             end
+        end
+        
+        % Create results subdirectory (matches MC structure)
+        timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+        run_dir = fullfile(output_dir, sprintf('%s_%s', label, timestamp));
+        if ~exist(run_dir, 'dir')
+            mkdir(run_dir);
         end
         
         % Prepare results structure
         results_struct = struct();
         results_struct.t = t;
         results_struct.x = x;
-        results_struct.u_log = u_log;  % Use u_log to match DataSchemas
+        results_struct.u_log = u_log;
         results_struct.trajectory = trajectory;
         results_struct.params = params;
         results_struct.params_plant = params_plant;
@@ -385,15 +389,18 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
                                        'x0', x0_full, 'dt', options.dt);
         results_struct.timestamp = datetime('now');
         
-        % Save with proper organization
-        save_options = struct();
-        save_options.verbose = verbose;
-        save_options.category = 'simulation';
+        % Save .mat file IN THE SUBDIRECTORY
+        DataManager.save_results(results_struct, 'results', run_dir, ...
+            struct('verbose', verbose, 'timestamp', false));
         
-        filepath = DataManager.save_results(results_struct, label, output_dir, save_options);
+        % Write metrics report IN THE SUBDIRECTORY
+        metrics_file = fullfile(run_dir, ANALYSIS_REPORT);
+        write_unified_metrics_report(results_struct, [], metrics_file);
         
         if verbose
-            fprintf('Results saved: %s\n\n', filepath);
+            fprintf('Results saved: %s\n', run_dir);
+            fprintf('  Data:    %s\n', fullfile(run_dir, Constants.SINGLE_RUN_DATA));
+            fprintf('  Metrics: %s\n\n', metrics_file);
         end
     end
     
@@ -514,7 +521,7 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
         results = struct();
         results.t = t;
         results.x = x;
-        results.u_log = u_log;  % Use u_log to match DataSchemas
+        results.u_log = u_log;
         results.trajectory = trajectory;
         results.params = params;
         results.params_plant = params_plant;

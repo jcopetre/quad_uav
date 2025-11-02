@@ -64,7 +64,7 @@ function generate_paper_outputs(results_dir, options)
     end
     
     %% Create figures subdirectory
-    figures_dir = fullfile(results_dir, 'figures');
+    figures_dir = fullfile(results_dir, Constants.FIGURES_DIR);
     if ~exist(figures_dir, 'dir')
         mkdir(figures_dir);
     end
@@ -82,7 +82,7 @@ function generate_paper_outputs(results_dir, options)
     if options.verbose
         fprintf('Loading nominal simulation...\n');
     end
-    nominal_file = fullfile(results_dir, 'nominal.mat');
+    nominal_file = fullfile(results_dir, Constants.NOMINAL_DATA);
     if ~exist(nominal_file, 'file')
         error('Nominal data file not found: %s\nRun simulate_monte_carlo first.', nominal_file);
     end
@@ -91,7 +91,7 @@ function generate_paper_outputs(results_dir, options)
     if options.verbose
         fprintf('Loading Monte Carlo results...\n');
     end
-    mc_file = fullfile(results_dir, 'monte_carlo.mat');
+    mc_file = fullfile(results_dir, Constants.MC_DATA);
     if ~exist(mc_file, 'file')
         error('Monte Carlo data file not found: %s\nRun simulate_monte_carlo first.', mc_file);
     end
@@ -127,6 +127,60 @@ function generate_paper_outputs(results_dir, options)
     analysis_options.close_figures = options.close_figures;
     
     analysis = analyze_monte_carlo(mc, analysis_options);
+
+    % Generate comprehensive metrics report
+    if options.verbose
+        fprintf('\nGenerating comprehensive metrics report...\n');
+    end
+    
+    % Store analysis results in mc structure (only if they exist)
+    if isfield(analysis, 'correlations')
+        mc.statistics.correlations = analysis.correlations;
+    end  
+    if isfield(analysis, 'sensitivity')
+        % Might be named 'sensitivity' instead
+        mc.statistics.normalized_sensitivity = analysis.sensitivity;
+    end
+    if isfield(analysis, 'param_data') && isfield(analysis.param_data, 'param_names')
+        mc.statistics.param_names = analysis.param_data.param_names;
+    end
+    
+    % Compute worst-case values from raw trial data
+    if isfield(analysis, 'metrics_data')
+        mc.statistics.worst_case = struct();
+        mc.statistics.worst_case.rmse_position_max = max(analysis.metrics_data.rmse_position);
+        mc.statistics.worst_case.rmse_attitude_max = max(analysis.metrics_data.rmse_attitude);
+        mc.statistics.worst_case.max_position_error_max = max(analysis.metrics_data.max_position_error);
+        
+        % Find which trial had worst values
+        [~, worst_pos_idx] = max(analysis.metrics_data.rmse_position);
+        [~, worst_att_idx] = max(analysis.metrics_data.rmse_attitude);
+        
+        mc.statistics.worst_case.worst_pos_trial = worst_pos_idx;
+        mc.statistics.worst_case.worst_att_trial = worst_att_idx;
+    
+        % Store parameter values for worst-case trial (position RMSE)
+        if isfield(analysis, 'param_data') && isfield(analysis.param_data, 'matrix')
+            % param_data.matrix is [n_trials x n_params]
+            mc.statistics.worst_case.worst_pos_params = analysis.param_data.matrix(worst_pos_idx, :);
+            mc.statistics.worst_case.worst_att_params = analysis.param_data.matrix(worst_att_idx, :);
+        end
+    end
+
+    % Write comprehensive report (with correlations)
+    metrics_file = fullfile(results_dir, Constants.ANALYSIS_REPORT);
+    write_unified_metrics_report(nominal, mc, metrics_file);
+
+    %% Generate LaTeX snippets
+    if options.verbose
+        fprintf('Generating LaTeX snippets...\n');
+    end
+    latex_file = fullfile(results_dir, Constants.LATEX_SNIPPETS);
+    write_latex_snippets(nominal, mc, latex_file);
+    
+    if options.verbose
+        fprintf('  Saved: %s\n', metrics_file);
+    end
     
     % Verify MC figures were created
     if options.verbose
@@ -139,15 +193,15 @@ function generate_paper_outputs(results_dir, options)
                 fprintf('  ✗ %s (missing)\n', mc_figure_files{i});
             end
         end
-    end
+    end       
     
-    %% Generate paper metrics table
+    %% Regenerate run log (if it doesn't exist or we're forcing regeneration)
     if options.verbose
-        fprintf('\nGenerating paper metrics table...\n');
+        fprintf('Regenerating run log...\n');
     end
-    metrics_file = fullfile(figures_dir, 'paper_metrics.txt');
-    write_paper_metrics(nominal, mc, analysis, metrics_file);
-    
+    log_file = fullfile(results_dir, Constants.RUN_LOG);
+    write_run_log(mc, nominal, log_file);
+
     %% Summary
     if options.verbose
         fprintf('\n=======================================================\n');
@@ -442,364 +496,7 @@ function add_waypoint_markers(nominal, show_labels, subplot_idx, total_subplots)
     end
 end
 
-function write_paper_metrics(nominal, mc, analysis, filename)
-    % Write comprehensive metrics table for paper using pre-computed analysis
-    
-    fid = fopen(filename, 'w');
-    if fid == -1
-        error('Could not open file for writing: %s', filename);
-    end
-    
-    try
-        fprintf(fid, '=================================================================\n');
-        fprintf(fid, 'COMPREHENSIVE METRICS SUMMARY FOR PAPER\n');
-        fprintf(fid, '=================================================================\n');
-        fprintf(fid, 'Generated: %s\n', datestr(now, 'yyyy-mm-dd HH:MM:SS'));
-        fprintf(fid, '=================================================================\n\n');
-        
-        %% Trajectory Information
-        fprintf(fid, 'TRAJECTORY INFORMATION\n');
-        fprintf(fid, '-----------------------------------------------------------------\n');
-        if isfield(mc.config, 'trajectory_file')
-            fprintf(fid, 'Trajectory:     %s\n', mc.config.trajectory_file);
-        end
-        fprintf(fid, 'Duration:       %.2f seconds\n', nominal.t(end));
-        fprintf(fid, 'Time steps:     %d\n', length(nominal.t));
-        fprintf(fid, '\n');
-        
-        %% Nominal Performance (Baseline)
-        fprintf(fid, 'NOMINAL SIMULATION (Baseline)\n');
-        fprintf(fid, '-----------------------------------------------------------------\n');
-        if isfield(nominal, 'metrics') && isfield(nominal.metrics, 'tracking')
-            m = nominal.metrics.tracking;
-            fprintf(fid, 'Position RMSE:       %.4f m\n', m.rmse_position);
-            fprintf(fid, 'Attitude RMSE:       %.4f rad (%.2f deg)\n', ...
-                    m.rmse_attitude, rad2deg(m.rmse_attitude));
-            fprintf(fid, 'Max Position Error:  %.4f m\n', m.max_position_error);
-            fprintf(fid, 'Max Roll:            %.4f rad (%.2f deg)\n', ...
-                    m.max_roll, rad2deg(m.max_roll));
-            fprintf(fid, 'Max Pitch:           %.4f rad (%.2f deg)\n', ...
-                    m.max_pitch, rad2deg(m.max_pitch));
-            
-            if isfield(nominal.metrics, 'control')
-                fprintf(fid, '\nControl Performance:\n');
-                if isfield(nominal.metrics.control, 'total_effort')
-                    fprintf(fid, '  Total Effort:      %.4f\n', nominal.metrics.control.total_effort);
-                end
-                if isfield(nominal.metrics.control, 'thrust_saturation_pct')
-                    fprintf(fid, '  Thrust Sat.:       %.1f%%\n', nominal.metrics.control.thrust_saturation_pct);
-                    fprintf(fid, '  Torque Sat.:       %.1f%%\n', nominal.metrics.control.torque_saturation_pct);
-                end
-            end
-        end
-        fprintf(fid, '\n');
-        
-        %% Monte Carlo Statistics
-        n_trials = length(mc.trials);
-        n_success = mc.statistics.n_success;
-        n_failed = mc.statistics.n_failed;
-        success_rate = 100 * n_success / n_trials;
-        
-        fprintf(fid, 'MONTE CARLO ROBUSTNESS ANALYSIS\n');
-        fprintf(fid, '-----------------------------------------------------------------\n');
-        fprintf(fid, 'Total Trials:        %d\n', n_trials);
-        fprintf(fid, 'Successful:          %d (%.1f%%)\n', n_success, success_rate);
-        fprintf(fid, 'Failed:              %d (%.1f%%)\n', n_failed, 100 - success_rate);
-        if isfield(mc, 'elapsed_time')
-            fprintf(fid, 'Computation Time:    %.1f seconds (%.2f sec/trial)\n', ...
-                    mc.elapsed_time, mc.elapsed_time / n_trials);
-        end
-        fprintf(fid, '\n');
-        
-        %% Performance Statistics (Successful Trials Only)
-        if isfield(mc, 'statistics') && isfield(mc.statistics, 'metrics')
-            m = mc.statistics.metrics;
-            
-            fprintf(fid, 'PERFORMANCE STATISTICS (Successful Trials)\n');
-            fprintf(fid, '-----------------------------------------------------------------\n');
-            
-            % Position RMSE
-            fprintf(fid, 'Position RMSE:\n');
-            fprintf(fid, '  Mean ± Std:        %.4f ± %.4f m\n', ...
-                    m.rmse_position_mean, m.rmse_position_std);
-            fprintf(fid, '  Median:            %.4f m\n', m.rmse_position_median);
-            fprintf(fid, '  Percentiles:\n');
-            fprintf(fid, '    5th:             %.4f m\n', m.rmse_position_percentiles(1));
-            fprintf(fid, '    25th:            %.4f m\n', m.rmse_position_percentiles(2));
-            fprintf(fid, '    75th:            %.4f m\n', m.rmse_position_percentiles(3));
-            fprintf(fid, '    95th:            %.4f m\n', m.rmse_position_percentiles(4));
-            fprintf(fid, '\n');
-            
-            % Attitude RMSE
-            fprintf(fid, 'Attitude RMSE:\n');
-            fprintf(fid, '  Mean ± Std:        %.4f ± %.4f rad (%.2f ± %.2f deg)\n', ...
-                    m.rmse_attitude_mean, m.rmse_attitude_std, ...
-                    rad2deg(m.rmse_attitude_mean), rad2deg(m.rmse_attitude_std));
-            fprintf(fid, '  Median:            %.4f rad (%.2f deg)\n', ...
-                    m.rmse_attitude_median, rad2deg(m.rmse_attitude_median));
-            fprintf(fid, '  Percentiles:\n');
-            fprintf(fid, '    5th:             %.4f rad (%.2f deg)\n', ...
-                    m.rmse_attitude_percentiles(1), rad2deg(m.rmse_attitude_percentiles(1)));
-            fprintf(fid, '    95th:            %.4f rad (%.2f deg)\n', ...
-                    m.rmse_attitude_percentiles(4), rad2deg(m.rmse_attitude_percentiles(4)));
-            fprintf(fid, '\n');
-            
-            % Control Effort (if available)
-            if isfield(m, 'control_effort_mean')
-                fprintf(fid, 'Control Effort:\n');
-                fprintf(fid, '  Mean ± Std:        %.4f ± %.4f\n', ...
-                        m.control_effort_mean, m.control_effort_std);
-                fprintf(fid, '\n');
-            end
-        end
-        
-        %% Parameter Correlation Analysis
-        fprintf(fid, 'PARAMETER CORRELATION ANALYSIS\n');
-        fprintf(fid, '-----------------------------------------------------------------\n');
-        fprintf(fid, '(Pearson correlation coefficients: -1 to +1)\n');
-        fprintf(fid, '(Positive = parameter increase worsens performance)\n\n');
-        
-        if isfield(analysis, 'correlations')
-            corr_data = analysis.correlations;
-            param_names = analysis.param_data.param_names;
-            
-            % Position RMSE correlations
-            fprintf(fid, 'Correlation with Position RMSE:\n');
-            [~, pos_idx] = sort(abs(corr_data.rmse_position), 'descend');
-            for i = 1:length(param_names)
-                idx = pos_idx(i);
-                fprintf(fid, '  %10s:  %+.3f', param_names{idx}, corr_data.rmse_position(idx));
-                if i == 1
-                    fprintf(fid, '  ** STRONGEST **\n');
-                else
-                    fprintf(fid, '\n');
-                end
-            end
-            fprintf(fid, '\n');
-            
-            % Attitude RMSE correlations
-            fprintf(fid, 'Correlation with Attitude RMSE:\n');
-            [~, att_idx] = sort(abs(corr_data.rmse_attitude), 'descend');
-            for i = 1:length(param_names)
-                idx = att_idx(i);
-                fprintf(fid, '  %10s:  %+.3f', param_names{idx}, corr_data.rmse_attitude(idx));
-                if i == 1
-                    fprintf(fid, '  ** STRONGEST **\n');
-                else
-                    fprintf(fid, '\n');
-                end
-            end
-            fprintf(fid, '\n');
-            
-            % Max position error correlations
-            if isfield(corr_data, 'max_position_error')
-                fprintf(fid, 'Correlation with Max Position Error:\n');
-                [~, max_idx] = sort(abs(corr_data.max_position_error), 'descend');
-                for i = 1:length(param_names)
-                    idx = max_idx(i);
-                    fprintf(fid, '  %10s:  %+.3f', param_names{idx}, corr_data.max_position_error(idx));
-                    if i == 1
-                        fprintf(fid, '  ** STRONGEST **\n');
-                    else
-                        fprintf(fid, '\n');
-                    end
-                end
-                fprintf(fid, '\n');
-            end
-        end
-        
-        %% Normalized Sensitivity Analysis
-        if isfield(analysis, 'sensitivity')
-            fprintf(fid, 'NORMALIZED SENSITIVITY INDICES\n');
-            fprintf(fid, '-----------------------------------------------------------------\n');
-            fprintf(fid, '(Normalized by parameter variation range)\n');
-            fprintf(fid, '(Higher absolute values = greater relative impact)\n\n');
-            
-            sens = analysis.sensitivity;
-            param_names = analysis.param_data.param_names;
-            
-            % Position RMSE sensitivity
-            fprintf(fid, 'Position RMSE Sensitivity:\n');
-            [~, idx] = sort(abs(sens.rmse_position), 'descend');
-            for i = 1:length(param_names)
-                fprintf(fid, '  %10s:  %+.3f', param_names{idx(i)}, sens.rmse_position(idx(i)));
-                if i == 1
-                    fprintf(fid, '  ** MOST SENSITIVE **\n');
-                else
-                    fprintf(fid, '\n');
-                end
-            end
-            fprintf(fid, '\n');
-            
-            % Attitude RMSE sensitivity
-            fprintf(fid, 'Attitude RMSE Sensitivity:\n');
-            [~, idx] = sort(abs(sens.rmse_attitude), 'descend');
-            for i = 1:length(param_names)
-                fprintf(fid, '  %10s:  %+.3f', param_names{idx(i)}, sens.rmse_attitude(idx(i)));
-                if i == 1
-                    fprintf(fid, '  ** MOST SENSITIVE **\n');
-                else
-                    fprintf(fid, '\n');
-                end
-            end
-            fprintf(fid, '\n');
-        end
-        
-        %% Worst-Case Analysis
-        fprintf(fid, 'WORST-CASE PERFORMANCE\n');
-        fprintf(fid, '-----------------------------------------------------------------\n');
-        if isfield(analysis, 'metrics_data')
-            metrics = analysis.metrics_data;
-            
-            [worst_pos, worst_pos_idx] = max(metrics.rmse_position);
-            [worst_att, worst_att_idx] = max(metrics.rmse_attitude);
-            
-            fprintf(fid, 'Worst Position RMSE:  %.4f m (successful trial #%d)\n', ...
-                    worst_pos, worst_pos_idx);
-            fprintf(fid, 'Worst Attitude RMSE:  %.4f rad (%.2f deg) (successful trial #%d)\n', ...
-                    worst_att, rad2deg(worst_att), worst_att_idx);
-            
-            if isfield(metrics, 'max_position_error')
-                [worst_max_err, worst_max_idx] = max(metrics.max_position_error);
-                fprintf(fid, 'Worst Max Error:      %.4f m (successful trial #%d)\n', ...
-                        worst_max_err, worst_max_idx);
-            end
-        end
-        fprintf(fid, '\n');
-        
-        %% Failure Analysis
-        if isfield(analysis, 'failure_analysis') && n_failed > 0
-            fprintf(fid, 'FAILURE ANALYSIS\n');
-            fprintf(fid, '-----------------------------------------------------------------\n');
-            fprintf(fid, 'Failed Trials:       %d (%.1f%%)\n\n', ...
-                    n_failed, 100 * n_failed / n_trials);
-            
-            fail = analysis.failure_analysis;
-            
-            fprintf(fid, 'Unique failure types: %d\n\n', ...
-                    length(fail.error_messages));
-            
-            fprintf(fid, 'Common failure messages:\n');
-            for i = 1:min(5, length(fail.error_messages))  % Top 5
-                fprintf(fid, '  %d. %s\n', i, fail.error_messages{i});
-            end
-            fprintf(fid, '\n');
-            
-            % Parameter patterns in failures
-            fprintf(fid, 'Average parameter values in failed trials:\n');
-            param_names = analysis.param_data.param_names;
-            for i = 1:length(param_names)
-                fprintf(fid, '  %10s:  %.4f ± %.4f\n', ...
-                        param_names{i}, ...
-                        fail.param_means(i), ...
-                        fail.param_stds(i));
-            end
-            fprintf(fid, '\n');
-        end
-        
-        %% LaTeX Snippets
-        fprintf(fid, '=================================================================\n');
-        fprintf(fid, 'LATEX SNIPPETS FOR PAPER\n');
-        fprintf(fid, '=================================================================\n\n');
-        
-        % Abstract / Introduction
-        fprintf(fid, '%% ABSTRACT / INTRODUCTION\n');
-        fprintf(fid, '%% Copy-paste these values directly into your paper\n');
-        fprintf(fid, '%%-----------------------------------------------------------\n\n');
-        if isfield(nominal, 'metrics') && isfield(nominal.metrics, 'tracking')
-            fprintf(fid, 'Nominal tracking accuracy:\n');
-            fprintf(fid, '$\\mathrm{RMSE}_{pos} = %.3f$ m, $\\mathrm{RMSE}_{att} = %.2f$ deg\n\n', ...
-                    nominal.metrics.tracking.rmse_position, ...
-                    rad2deg(nominal.metrics.tracking.rmse_attitude));
-        end
-        fprintf(fid, 'Monte Carlo validation: $N = %d$ trials with $%.1f\\%%$ success rate\n\n', ...
-                n_trials, success_rate);
-        
-        % Results Section
-        fprintf(fid, '%% RESULTS SECTION\n');
-        fprintf(fid, '%%-----------------------------------------------------------\n\n');
-        if isfield(mc.statistics, 'metrics')
-            m = mc.statistics.metrics;
-            
-            fprintf(fid, '%% Performance under parameter uncertainty:\n');
-            fprintf(fid, 'Position tracking: $%.3f \\pm %.3f$ m (mean $\\pm$ std)\n\n', ...
-                    m.rmse_position_mean, m.rmse_position_std);
-            fprintf(fid, 'Attitude tracking: $%.2f \\pm %.2f$ deg (mean $\\pm$ std)\n\n', ...
-                    rad2deg(m.rmse_attitude_mean), rad2deg(m.rmse_attitude_std));
-            
-            % Table for percentiles
-            fprintf(fid, '%% Table: Performance Distribution\n');
-            fprintf(fid, '\\begin{table}[h]\n');
-            fprintf(fid, '\\centering\n');
-            fprintf(fid, '\\begin{tabular}{lcc}\n');
-            fprintf(fid, '\\hline\n');
-            fprintf(fid, 'Metric & Position RMSE (m) & Attitude RMSE (deg) \\\\\n');
-            fprintf(fid, '\\hline\n');
-            fprintf(fid, 'Mean & %.3f & %.2f \\\\\n', ...
-                    m.rmse_position_mean, rad2deg(m.rmse_attitude_mean));
-            fprintf(fid, 'Std Dev & %.3f & %.2f \\\\\n', ...
-                    m.rmse_position_std, rad2deg(m.rmse_attitude_std));
-            fprintf(fid, 'Median & %.3f & %.2f \\\\\n', ...
-                    m.rmse_position_median, rad2deg(m.rmse_attitude_median));
-            fprintf(fid, '5th Percentile & %.3f & %.2f \\\\\n', ...
-                    m.rmse_position_percentiles(1), rad2deg(m.rmse_attitude_percentiles(1)));
-            fprintf(fid, '95th Percentile & %.3f & %.2f \\\\\n', ...
-                    m.rmse_position_percentiles(4), rad2deg(m.rmse_attitude_percentiles(4)));
-            fprintf(fid, '\\hline\n');
-            fprintf(fid, '\\end{tabular}\n');
-            fprintf(fid, '\\caption{Monte Carlo Performance Distribution ($N=%d$ successful trials)}\n', n_success);
-            fprintf(fid, '\\label{tab:mc_performance}\n');
-            fprintf(fid, '\\end{table}\n\n');
-        end
-        
-        % Discussion Section - Parameter Sensitivity
-        fprintf(fid, '%% DISCUSSION SECTION - Parameter Sensitivity\n');
-        fprintf(fid, '%%-----------------------------------------------------------\n\n');
-        if isfield(analysis, 'correlations')
-            param_names = analysis.param_data.param_names;
-            corr_data = analysis.correlations;
-            
-            % Find strongest correlations
-            [~, pos_strongest_idx] = max(abs(corr_data.rmse_position));
-            [~, att_strongest_idx] = max(abs(corr_data.rmse_attitude));
-            
-            fprintf(fid, '%% Key sensitivity findings:\n');
-            fprintf(fid, 'Position tracking most sensitive to %s ($r = %+.3f$)\n\n', ...
-                    param_names{pos_strongest_idx}, ...
-                    corr_data.rmse_position(pos_strongest_idx));
-            
-            fprintf(fid, 'Attitude tracking most sensitive to %s ($r = %+.3f$)\n\n', ...
-                    param_names{att_strongest_idx}, ...
-                    corr_data.rmse_attitude(att_strongest_idx));
-        end
-        
-        % Conclusion Section
-        fprintf(fid, '%% CONCLUSION SECTION\n');
-        fprintf(fid, '%%-----------------------------------------------------------\n\n');
-        fprintf(fid, '%% Robustness summary:\n');
-        fprintf(fid, 'System achieved $%.1f\\%%$ success rate across $N=%d$ trials\n', ...
-                success_rate, n_trials);
-        fprintf(fid, 'with parameter variations representing operational uncertainties.\n\n');
-        
-        if isfield(mc.statistics, 'metrics')
-            m = mc.statistics.metrics;
-            fprintf(fid, '%% Performance remained within acceptable bounds:\n');
-            fprintf(fid, '95th percentile errors: $%.3f$ m (position), $%.2f$ deg (attitude)\n\n', ...
-                    m.rmse_position_percentiles(4), ...
-                    rad2deg(m.rmse_attitude_percentiles(4)));
-        end
-        
-        fprintf(fid, '=================================================================\n');
-        fprintf(fid, 'END OF METRICS REPORT\n');
-        fprintf(fid, '=================================================================\n');
-        
-    catch ME
-        fclose(fid);
-        rethrow(ME);
-    end
-    
-    fclose(fid);
-end
+
 
 function listing = list_available_runs(run_label)
     % List available run directories for debugging

@@ -195,7 +195,7 @@ classdef DataManager
             end
             
             % Save
-            filepath = fullfile(output_dir, 'monte_carlo.mat');
+            filepath = fullfile(output_dir, Constants.MC_DATA);
             save(filepath, 'mc_results', '-v7.3');
             
             if options.verbose

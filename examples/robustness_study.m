@@ -35,10 +35,10 @@ end
 %% ========================================================================
 
 % Choose trajectory
-TRAJECTORY_FILE = 'simple_square.wpt';
+TRAJECTORY_FILE = 'figure_eight_long.wpt';
 
 VERBOSE = false;
-PARALLEL = false;
+PARALLEL = true;
 N_TRIALS = 10;
 
 % Run identifier (used in directory naming)
@@ -53,18 +53,16 @@ mc_options.verbose = VERBOSE;           % Show progress
 
 % Optional: Define custom parameter uncertainties
 % If left commented, simulate_monte_carlo uses sensible defaults
-%
-% params_nominal = quadrotor_linear_6dof();
-% perturb_config = struct();
-% perturb_config.params = {
-%     'm',   'normal', params_nominal.m, params_nominal.m * 0.10;
-%     'Ixx', 'normal', params_nominal.Ixx, params_nominal.Ixx * 0.10;
-%     'Iyy', 'normal', params_nominal.Iyy, params_nominal.Iyy * 0.10;
-%     'Izz', 'normal', params_nominal.Izz, params_nominal.Izz * 0.10;
-%     'L',   'normal', params_nominal.L, params_nominal.L * 0.005;
-% };
-
-perturb_config = [];  % Use defaults
+% perturb_config = [];  % Use defaults
+params_nominal = quadrotor_linear_6dof();
+perturb_config = struct();
+perturb_config.params = {
+    'm',   'normal', params_nominal.m, params_nominal.m * 0.10;
+    'Ixx', 'normal', params_nominal.Ixx, params_nominal.Ixx * 0.10;
+    'Iyy', 'normal', params_nominal.Iyy, params_nominal.Iyy * 0.10;
+    'Izz', 'normal', params_nominal.Izz, params_nominal.Izz * 0.10;
+    'L',   'normal', params_nominal.L, params_nominal.L * 0.005;
+};
 
 fprintf('\n');
 fprintf('================================================================\n');
@@ -156,7 +154,7 @@ fprintf('STEP 4: EXAMINE RESULTS\n');
 fprintf('----------------------------------------------------------------\n');
 fprintf('All files saved successfully!\n\n');
 
-figures_dir = fullfile(results_dir, 'figures');
+figures_dir = fullfile(results_dir, Constants.FIGURES_DIR);
 
 fprintf('Output locations:\n');
 fprintf('  Results:  %s\n', results_dir);
@@ -164,16 +162,14 @@ fprintf('  Figures:  %s\n', figures_dir);
 fprintf('\n');
 
 fprintf('Key files:\n');
-fprintf('  Nominal data:    %s\n', fullfile(results_dir, 'nominal.mat'));
-fprintf('  MC data:         %s\n', fullfile(results_dir, 'monte_carlo.mat'));
-fprintf('  Metrics summary: %s\n', metrics_file);
-fprintf('  Paper metrics:   %s\n', fullfile(figures_dir, 'paper_metrics.txt'));
+fprintf('  Nominal data:    %s\n', fullfile(results_dir, Constants.NOMINAL_DATA));
+fprintf('  MC data:         %s\n', fullfile(results_dir, Constants.MC_DATA));
 fprintf('\n');
 
 % Load and display key metrics
 fprintf('Quick metrics preview:\n');
 fprintf('----------------------------------------------------------------\n');
-nominal_file = fullfile(results_dir, 'nominal.mat');
+nominal_file = fullfile(results_dir, NOMINAL_DATA);
 if exist(nominal_file, 'file')
     nominal = DataManager.load_results(nominal_file);
     if isfield(nominal, 'metrics') && isfield(nominal.metrics, 'tracking')
@@ -183,7 +179,7 @@ if exist(nominal_file, 'file')
     end
 end
 
-mc_file = fullfile(results_dir, 'monte_carlo.mat');
+mc_file = fullfile(results_dir, Constants.MC_DATA);
 if exist(mc_file, 'file')
     mc = DataManager.load_monte_carlo(mc_file, struct('validate', false, 'migrate', false));
     fprintf('\nMonte Carlo Results:\n');
