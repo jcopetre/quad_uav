@@ -126,7 +126,7 @@ results_dir = simulate_monte_carlo(trajectory_file, run_label, perturb_config, m
 ./results/<run_label>_<timestamp>/
 ├── nominal.mat              % Nominal simulation
 ├── monte_carlo.mat          % MC results
-└── metrics_<timestamp>.txt  % Summary report
+└── mc_run_log.txt  % Run configuration summary
 ```
 
 **Examples**:
@@ -583,7 +583,8 @@ generate_paper_outputs(results_dir, options)
 5. `distributions.png`
 6. `boxplots.png`
 7. `correlation.png`
-8. `paper_metrics.txt` (LaTeX snippets)
+8. `analysis_report.txt` (comprehensive analysis with correlations)
+9. `latex_snippets.txt` (LaTeX snippets for paper)
 
 **Example**:
 ```matlab
@@ -594,6 +595,11 @@ generate_paper_outputs(results_dir);
 opts.close_figures = false;
 generate_paper_outputs(results_dir, opts);
 ```
+````markdown
+**Note**: `generate_paper_outputs()` can be run multiple times to regenerate
+all analysis and figures from the saved .mat files without re-running simulations.
+This enables iterating on report formats and figure styling.
+````
 
 ---
 

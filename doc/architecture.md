@@ -51,7 +51,10 @@ src/
 │   └── generate_trajectory_minsnap.m # Minimum snap optimization
 │
 ├── output/              # Results generation
-│   └── generate_paper_outputs.m      # Publication figures
+│   ├── generate_paper_outputs.m      # Publication figures
+│   ├── write_unified_metrics_report.m    # Unified metrics writer
+│   ├── write_run_log.m                   # MC configuration log
+│   └── write_latex_snippets.m            # LaTeX snippet generator
 │
 ├── data/                # Data management
 │   ├── DataManager.m                 # I/O with validation
@@ -140,7 +143,7 @@ simulate_monte_carlo()                   [src/monte_carlo/]
     ├──> DataManager.save_monte_carlo()  [src/data/]
     │    └──> Saves monte_carlo.mat
     │
-    └──> Write metrics_*.txt report
+    └──> Write mc_run_log.txt (configuration only)
 ```
 
 Later (separate call):
@@ -149,7 +152,9 @@ generate_paper_outputs(results_dir)     [src/output/]
     │
     ├──> Loads nominal.mat, monte_carlo.mat
     ├──> Generates 7 publication figures
-    └──> Writes paper_metrics.txt (LaTeX snippets)
+    ├──> Analyze results (correlations, sensitivity)
+    ├──> Write analysis_report.txt (comprehensive metrics)
+    └──> Write latex_snippets.txt (LaTeX snippets)
 ```
 
 ## Coordinate Frames

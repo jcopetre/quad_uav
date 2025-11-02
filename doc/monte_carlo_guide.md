@@ -71,7 +71,7 @@ results_dir = simulate_monte_carlo(trajectory_file, run_label, perturb_config, m
 Output: `./results/<run_label>_<timestamp>/`
 - `nominal.mat` - Baseline (unperturbed) simulation
 - `monte_carlo.mat` - All trial results
-- `metrics_<timestamp>.txt` - Summary statistics
+- `mc_run_log.txt` - Run configuration and execution summary
 
 **Important**: This is expensive (minutes to hours). Only run once per study.
 
@@ -85,9 +85,29 @@ generate_paper_outputs(results_dir);
 
 Output: `./results/<run_label>_<timestamp>/figures/`
 - 7 publication-quality PNG figures
-- `paper_metrics.txt` - LaTeX snippets for paper
+- `analysis_report.txt` - Comprehensive analysis with correlations
+- `latex_snippets.txt` - LaTeX snippets for paper
 
 **Benefit**: Iterate on figure appearance without regenerating data.
+
+### Phase 3: Regeneration (Instant)
+
+**Key capability**: Regenerate all outputs from .mat files:
+```matlab
+% Delete outputs to test
+delete(fullfile(results_dir, 'analysis_report.txt'));
+delete(fullfile(results_dir, 'latex_snippets.txt'));
+rmdir(fullfile(results_dir, 'figures'), 's');
+
+% Regenerate everything instantly
+generate_paper_outputs(results_dir);
+```
+
+**Benefits**:
+- Iterate on report formatting without re-simulating
+- Update figures after tweaking visualization code
+- Recover from accidental deletions
+- True separation: expensive simulation vs. cheap post-processing
 
 ## Parameter Configuration
 
@@ -214,18 +234,34 @@ delete(gcp('nocreate'));
 ### Metrics Summary File
 
 After running `simulate_monte_carlo`, check:
+`````
+./results/<run_label>_<timestamp>/mc_run_log.txt
+`````
 
-```
-./results/<run_label>_<timestamp>/metrics_<timestamp>.txt
-```
+Contains run configuration:
+- Trajectory settings
+- Vehicle parameters
+- Monte Carlo configuration (trials, seed, parallel)
+- Parameter perturbations
+- Execution summary (success rate, timing)
+
+For comprehensive analysis with correlations, run:
+`````matlab
+generate_paper_outputs(results_dir);
+`````
+
+This creates:
+`````
+./results/<run_label>_<timestamp>/analysis_report.txt
+`````
 
 Contains:
-- Overall statistics (success rate, trial count)
-- Nominal performance (baseline)
-- Monte Carlo performance (mean, std, percentiles)
-- Parameter correlations (which params affect performance most)
+- Configuration recap
+- Nominal and Monte Carlo performance
+- **Parameter correlations** (which params affect performance most)
+- **Sensitivity analysis** (normalized impact)
+- **Worst-case performance** (with parameter configurations)
 - Failure analysis (if any trials failed)
-- LaTeX snippets (copy-paste into paper)
 
 ### Example Metrics
 
@@ -327,7 +363,9 @@ Creates 7 figures in `./results/<run_label>_<timestamp>/figures/`:
 6. **boxplots.png**: Statistical distributions
 7. **correlation.png**: Parameter-performance correlations
 
-Plus: **paper_metrics.txt** with LaTeX snippets
+Plus:
+- **analysis_report.txt** - Comprehensive metrics with correlations
+- **latex_snippets.txt** - Copy-paste LaTeX for paper
 
 ### Options
 
@@ -611,10 +649,10 @@ Additionally include:
 
 ### LaTeX Snippets
 
-The `paper_metrics.txt` file contains ready-to-use LaTeX:
+The `latex_snippets.txt` file contains ready-to-use LaTeX:
 
 ```latex
-% From paper_metrics.txt
+% From latex_snippets.txt
 Monte Carlo validation: $N = 500$ trials with $99.6\%$ success rate
 
 Performance under parameter uncertainty:
