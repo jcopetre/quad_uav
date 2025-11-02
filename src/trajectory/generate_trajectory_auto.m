@@ -104,6 +104,7 @@ function trajectory = generate_trajectory_auto(waypoints, params, dt)
         'max_segment', max(segment_durations), ...
         'threshold', SAFE_SEGMENT_THRESHOLD, ...
         'auto_selected', true);
+    trajectory.waypoints = waypoints;
     
     %% Post-generation validation
     max_acc = max(vecnorm(trajectory.acceleration, 2, 2));

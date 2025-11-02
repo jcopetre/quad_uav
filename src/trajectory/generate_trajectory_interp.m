@@ -234,6 +234,8 @@ trajectory.omega(:, 3) = yaw_rate;  % r (yaw rate only)
 trajectory.method = 'interpolation';
 trajectory.method_reason = 'User requested interpolation directly';
 
+trajectory.waypoints = waypoints;
+
 %% Display summary
 fprintf('Generated trajectory:\n');
 fprintf('  Duration: %.2f seconds\n', t_end - t_start);

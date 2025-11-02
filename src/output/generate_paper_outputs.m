@@ -188,11 +188,10 @@ function fig = create_3d_tracking_figure(nominal)
     plot3(pos_ref(:,1), pos_ref(:,2), pos_ref(:,3), 'r--', 'LineWidth', 1.5);
     
     % Add waypoints if available
-    show_waypoints = false;
-    if isfield(nominal, 'config') && isfield(nominal.config, 'trajectory_file')
+    show_waypoints = true;
+    if isfield(nominal.trajectory, 'waypoints')
         try
-            % Load original waypoint file
-            wpt = load_waypoints(nominal.config.trajectory_file);
+            wpt = nominal.trajectory.waypoints;
             
             % Plot waypoint markers
             plot3(wpt.position(:,1), wpt.position(:,2), wpt.position(:,3), ...
@@ -238,15 +237,14 @@ function fig = create_3d_tracking_figure(nominal)
                         
                         text(label_pos(1), label_pos(2), label_pos(3), label_text, ...
                              'FontSize', 9, 'FontWeight', 'bold', ...
-                             'HorizontalAlignment', 'center');
+                             'HorizontalAlignment', 'center', ...
+                             'Interpreter', 'none');
                     end
                 end
             end
-            
-            show_waypoints = true;
         catch ME
-            % If waypoint loading fails, skip waypoint markers
-            warning('Could not load waypoints: %s', ME.message);
+            % If waypoint plotting fails, skip waypoint markers
+            warning('Could not plot waypoints: %s', ME.message);
         end
     end
     
@@ -399,13 +397,13 @@ function add_waypoint_markers(nominal, show_labels, subplot_idx, total_subplots)
         total_subplots = 1;
     end
     
-    % Try to load waypoints
-    if ~isfield(nominal, 'config') || ~isfield(nominal.config, 'trajectory_file')
+    % Try to get waypoints from trajectory structure
+    if ~isfield(nominal, 'trajectory') || ~isfield(nominal.trajectory, 'waypoints')
         return;
     end
     
     try
-        wpt = load_waypoints(nominal.config.trajectory_file);
+        wpt = nominal.trajectory.waypoints;
         waypoint_times = wpt.time;
         if isfield(wpt, 'labels')
             waypoint_labels = wpt.labels;
@@ -414,8 +412,7 @@ function add_waypoint_markers(nominal, show_labels, subplot_idx, total_subplots)
         end
     catch
         return;
-    end
-    
+    end    
     % Ensure waypoints are sorted (defensive check, should already be sorted)
     [waypoint_times, sort_idx] = sort(waypoint_times);
     if ~isempty(waypoint_labels)
@@ -438,7 +435,8 @@ function add_waypoint_markers(nominal, show_labels, subplot_idx, total_subplots)
             if ~isempty(waypoint_labels{j})
                 text(waypoint_times(j), ylim_current(2), sprintf(' %s', waypoint_labels{j}), ...
                      'VerticalAlignment', 'top', 'FontSize', 8, ...
-                     'Color', [0.3 0.3 0.3], 'FontWeight', 'bold');
+                     'Color', [0.3 0.3 0.3], 'FontWeight', 'bold', ...
+                     'Interpreter', 'none');
             end
         end
     end
