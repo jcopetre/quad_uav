@@ -49,16 +49,15 @@ function x_dot = quadrotor_dynamics_pure(x, u, params)
 %     - Yaw   (ψ):  Rotation about z_b (vertical)   - controlled by Izz
 %
 %       For example: 
-%                  Motor 1 (Forward)
-%                         |
-%                         | x-axis (roll)
-%                         |
-%        Motor 4 ---------+--------- Motor 2
-%        (Left)        COM        (Right)
-%                         |
-%                         | y-axis (pitch)
-%                         |
-%                   Motor 3 (Rear)
+%                Motor 1 (Front)
+%                     |
+%                     | x_body (roll axis)    ← COM to Motor 1 is +x
+%                     |
+%        Motor 4 ---- COM ---- Motor 2
+%            (Left)   |   (Right)  
+%                     | y_body (pitch axis)  ← COM to Motor 2 is +y
+%                     |
+%                Motor 3 (Rear)
 %
 % DYNAMICS EQUATIONS:
 %   Position:    ṙ = v  (position doesn't affect dynamics; purely kinematic)
