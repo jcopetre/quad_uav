@@ -87,15 +87,15 @@ function analysis = analyze_monte_carlo(mc_results, analysis_options)
     
     n_success = sum(success_flags);
     n_failed = sum(~success_flags);
-    n_total = length(trials);
+    n_trials = length(trials);
     
     %% Basic Statistics Report
     if analysis_options.verbose
         fprintf('OVERALL STATISTICS\n');
         fprintf('------------------\n');
-        fprintf('Total trials:        %d\n', n_total);
-        fprintf('Successful:          %d (%.1f%%)\n', n_success, 100*n_success/n_total);
-        fprintf('Failed:              %d (%.1f%%)\n\n', n_failed, 100*n_failed/n_total);
+        fprintf('Total trials:        %d\n', n_trials);
+        fprintf('Successful:          %d (%.1f%%)\n', n_success, 100*n_success/n_trials);
+        fprintf('Failed:              %d (%.1f%%)\n\n', n_failed, 100*n_failed/n_trials);
     end
     
     if n_success == 0
@@ -182,7 +182,7 @@ function analysis = analyze_monte_carlo(mc_results, analysis_options)
         if analysis_options.verbose
             fprintf('\nFAILURE ANALYSIS\n');
             fprintf('----------------\n');
-            fprintf('Failed trials: %d (%.1f%%)\n\n', n_failed, 100*n_failed/n_total);
+            fprintf('Failed trials: %d (%.1f%%)\n\n', n_failed, 100*n_failed/n_trials);
         end
         
         failure_analysis = analyze_failures(failed_trials, perturb_config);
