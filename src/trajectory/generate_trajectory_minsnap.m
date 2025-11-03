@@ -166,7 +166,7 @@ trajectory.method_reason = 'User requested minimum snap directly';
 trajectory.waypoints = waypoints;
 
 %% Display summary
-fprintf('\nTrajectory generation complete:\n');
+fprintf('Trajectory generation complete:\n');
 fprintf('  Total computation time: %.3f s\n', t_x + t_y + t_z + t_eval + t_yaw + t_att);
 fprintf('  Duration: %.2f seconds\n', trajectory.time(end) - trajectory.time(1));
 fprintf('  Points: %d (dt = %.3f s)\n', length(trajectory.time), dt);

@@ -40,11 +40,20 @@ function write_unified_metrics_report(results, mc_results, output_file)
         % Write all sections
         write_header(fid, has_mc);
         write_configuration(fid, results);
+        write_trajectory_feasibility(fid, results);
         write_performance(fid, results, has_mc);
         
         if has_mc
             write_mc_statistics(fid, mc_results);
             write_sensitivity(fid, mc_results);
+    
+            fprintf(fid, '\nMONTE CARLO TRAJECTORY FEASIBILITY\n');
+            fprintf(fid, '-----------------------------------------------------------------\n');
+            fprintf(fid, 'Trials with feasibility warnings: %d / %d (%.1f%%)\n', ...
+                    mc_results.statistics.trajectory_feasibility.n_infeasible, ...
+                    mc_results.statistics.n_trials, ...
+                    mc_results.statistics.trajectory_feasibility.pct_infeasible);
+            fprintf(fid, '\n');
         end
         
         write_footer(fid);
@@ -515,6 +524,51 @@ function write_sensitivity(fid, mc_results)
     end
     
     fprintf(fid, '\n');
+end
+
+function write_trajectory_feasibility(fid, results)
+    % Write trajectory feasibility analysis
+    
+    if ~isfield(results.trajectory, 'feasibility')
+        return;  % Not checked
+    end
+    
+    fprintf(fid, '\nTRAJECTORY FEASIBILITY\n');
+    fprintf(fid, '-----------------------------------------------------------------\n');
+    
+    feas = results.trajectory.feasibility;
+    
+    % Overall status
+    if feas.feasible
+        fprintf(fid, 'Status: ✅ All checks passed\n\n');
+    else
+        fprintf(fid, 'Status: ⚠️ %d warning(s) detected\n\n', length(feas.warnings));
+    end
+    
+    % Key metrics
+    v = feas.violations;
+    fprintf(fid, 'Trajectory Demands:\n');
+    fprintf(fid, '  Max Attitude:     %.1f° (limit: <%.1f°)\n', ...
+            v.max_attitude, v.limits.small_angle);
+    fprintf(fid, '  Max Velocity:     %.2f m/s (warning: >%.1f m/s)\n', ...
+            v.max_velocity, v.limits.velocity_warning);
+    fprintf(fid, '  Max Horiz Accel:  %.2f m/s² (safe: <%.2f m/s²)\n', ...
+            v.max_horiz_accel, v.limits.accel_safe);
+    fprintf(fid, '  Max Yaw Rate:     %.1f°/s (warning: >%.1f°/s)\n', ...
+            v.max_yaw_rate, v.limits.yaw_rate_warning);
+    fprintf(fid, '  RMS Yaw Rate:     %.1f°/s (limit: <20.0°/s)\n', v.rms_yaw_rate);
+    fprintf(fid, '  Max Yaw Accel:    %.1f°/s² (physical: <%.1f°/s²)\n', ...
+            v.max_yaw_accel, v.limits.yaw_accel_physical);
+    fprintf(fid, '\n');
+    
+    % Warnings
+    if ~feas.feasible
+        fprintf(fid, 'Warnings:\n');
+        for i = 1:length(feas.warnings)
+            fprintf(fid, '  %d. %s\n', i, feas.warnings{i});
+        end
+        fprintf(fid, '\n');
+    end
 end
 
 function write_footer(fid)

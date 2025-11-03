@@ -335,6 +335,141 @@ JSON format with metadata:
 **Yaw specification**:
 - Explicit value (0.0): Fixed heading
 - `null`: Auto-calculate from velocity direction
+  - ⚠️ **Warning**: Auto-calculated yaw can produce excessive yaw rates on curved trajectories (e.g., circles, figure-eights), potentially exceeding actuator limits or linearization validity. Always check trajectory feasibility (see [Trajectory Feasibility Checking](#trajectory-feasibility-checking)) when using auto-yaw.
+  - **Best practice**: Use constant yaw (e.g., 0.0) unless heading must track velocity direction
+  - **Alternative**: Manually specify yaw at waypoints for smoother transitions
+
+## Trajectory Feasibility Checking
+
+**File**: `check_trajectory_feasibility.m`
+
+Validates trajectory demands against vehicle physical constraints before simulation.
+
+### Purpose
+
+Catches infeasible trajectories early to prevent:
+- Excessive yaw rates exceeding actuator capabilities
+- Aggressive maneuvers violating linearization assumptions
+- Poor tracking performance from unrealistic reference trajectories
+
+### Checks Performed
+```matlab
+feasibility = check_trajectory_feasibility(trajectory, params)
+
+% Returns structure:
+feasibility.feasible           % Boolean: overall feasibility
+feasibility.warnings           % Cell array of warning messages
+feasibility.violations
+    .max_attitude              % Maximum reference attitude [deg]
+    .max_velocity              % Maximum velocity [m/s]
+    .max_horiz_accel          % Maximum horizontal acceleration [m/s²]
+    .max_yaw_rate             % Maximum yaw rate [deg/s]
+    .rms_yaw_rate             % RMS yaw rate [deg/s]
+    .max_yaw_accel            % Maximum yaw acceleration [deg/s²]
+    .limits
+        .yaw_rate_warning     % Warning threshold [deg/s]
+        .yaw_accel_physical   % Physical limit [deg/s²]
+```
+
+### Validation Criteria
+
+| Metric | Warning Threshold | Critical Limit | Rationale |
+|--------|------------------|----------------|-----------|
+| Yaw rate | 50 deg/s | 100 deg/s | Actuator saturation |
+| Yaw acceleration | τ_max / I_zz | - | Physical constraint |
+| Attitude angle | 15 deg | - | Linearization validity |
+
+### Integration
+
+Feasibility checking is automatically integrated into `simulate_trajectory()`:
+- Runs after trajectory generation
+- Results stored in `results.trajectory.feasibility`
+- Warnings printed to console if issues detected
+- Included in `analysis_report.txt`
+
+### Example
+```matlab
+% Check a waypoint file
+wpt = load_waypoints('aggressive_maneuver.wpt');
+trajectory = generate_trajectory_auto(wpt, params);
+feasibility = check_trajectory_feasibility(trajectory, params);
+
+if ~feasibility.feasible
+    fprintf('Trajectory infeasible:\n');
+    for i = 1:length(feasibility.warnings)
+        fprintf('  - %s\n', feasibility.warnings{i});
+    end
+end
+
+% Common fix: Use constant yaw instead of auto-calculated
+wpt.yaw = zeros(size(wpt.yaw));
+trajectory = generate_trajectory_auto(wpt, params);
+```
+### Common Feasibility Issues
+
+**Auto-Calculated Yaw on Curved Paths**
+
+The most common source of infeasible trajectories is auto-calculated yaw (`yaw: null` in waypoint files) on curved paths:
+```matlab
+% ❌ PROBLEMATIC: Auto-yaw on figure-eight
+wpt = load_waypoints('figure_eight_long.wpt');  % Has yaw: null
+trajectory = generate_trajectory_auto(wpt, params);
+feas = check_trajectory_feasibility(trajectory, params);
+% WARNING: Max yaw rate 127 deg/s exceeds physical limit 87 deg/s
+
+% ✅ SOLUTION 1: Use constant yaw
+wpt.yaw = zeros(size(wpt.yaw));  % Force yaw = 0
+trajectory = generate_trajectory_auto(wpt, params);
+% PASS: Max yaw rate 3.2 deg/s
+
+% ✅ SOLUTION 2: Manually specify waypoint yaw angles
+% Edit .wpt file to include explicit yaw values at each waypoint
+```
+
+**Why This Happens:**
+
+Auto-calculated yaw attempts to align heading with instantaneous velocity direction. On curved trajectories:
+1. Velocity direction changes rapidly
+2. Interpolation between waypoints creates high yaw rates
+3. Yaw acceleration can exceed τ_max / I_zz
+
+**When Auto-Yaw Is Safe:**
+- Straight-line segments
+- Gentle curves with long segment durations (>5 seconds)
+- Low-speed maneuvers
+
+**When to Avoid Auto-Yaw:**
+- Tight turns or circular paths
+- Figure-eight or S-curve patterns
+- High-speed maneuvers
+- Short segment durations (<3 seconds)
+
+### Validation Workflow
+
+Recommended workflow for new trajectories:
+```matlab
+% 1. Load and generate
+wpt = load_waypoints('new_trajectory.wpt');
+trajectory = generate_trajectory_auto(wpt, params);
+
+% 2. Check feasibility
+feas = check_trajectory_feasibility(trajectory, params);
+
+% 3. If infeasible, try constant yaw
+if ~feas.feasible
+    fprintf('Infeasible! Trying constant yaw...\n');
+    wpt.yaw = zeros(size(wpt.yaw));
+    trajectory = generate_trajectory_auto(wpt, params);
+    feas = check_trajectory_feasibility(trajectory, params);
+end
+
+% 4. Simulate if feasible
+if feas.feasible
+    results = simulate_trajectory(wpt, params.Q, params.R);
+else
+    fprintf('Trajectory remains infeasible. Adjust waypoints.\n');
+end
+```
 
 ## Control System
 
@@ -420,8 +555,10 @@ DataSchemas.SimulationResult()
     .u_log          % Control history [N×4]
     .trajectory     % TrajectoryData struct
     .params         % Vehicle parameters
+    .params_plant   % Plant parameters (MC studies, optional)
     .metrics        % PerformanceMetrics struct
     .config         % Configuration used
+    .output_dir     % Output directory path (optional)
 
 % Trajectory data
 DataSchemas.TrajectoryData()
@@ -431,7 +568,9 @@ DataSchemas.TrajectoryData()
     .acceleration   % [N×3]
     .attitude       % [N×3] (Euler angles)
     .omega          % [N×3] (angular rates)
-    .method         % 'interpolation' or 'minsnap'
+    .method         % 'makima' or 'minsnap'
+    .waypoints      % Original waypoint structure (optional)
+    .feasibility    % Feasibility check results (optional)
 
 % Monte Carlo result
 DataSchemas.MonteCarloResult()
@@ -471,11 +610,12 @@ nominal = DataManager.load_results(filepath, struct('validate', false));
 
 ```
 test/
-├── run_tests.m                  # Automated test runner
-├── setup_test_environment.m     # Path configuration
-├── test_*.m                     # Unit tests (38 tests)
-├── inttest_*.m                  # Integration tests (8 tests)
-└── quick_*.m                    # Fast validation (3 tests)
+├── run_tests.m                      # Automated test runner
+├── setup_test_environment.m         # Path configuration
+├── test_*.m                         # Unit tests 
+├── test_trajectory_feasibility.m    # Feasibility checking 
+├── inttest_*.m                      # Integration tests, run manually 
+└── quick_*.m                        # Fast validation 
 ```
 
 ### Running Tests
@@ -503,8 +643,6 @@ quick_test_sim
 - **Trajectories**: Waypoint loading, generation methods, auto-selection
 - **Monte Carlo**: Parameter sampling, reproducibility, statistics
 - **Integration**: Closed-loop, trajectory tracking, end-to-end
-
-**Total**: 61+ tests across all core functionality
 
 ## Performance Considerations
 

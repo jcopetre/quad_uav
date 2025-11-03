@@ -330,6 +330,58 @@ trajectory = generate_trajectory_minsnap(wpt, params, dt)
 
 **Reference**: Mellinger & Kumar (2011)
 
+### check_trajectory_feasibility
+
+Validates trajectory feasibility against vehicle constraints.
+
+**Syntax:**
+```matlab
+feasibility = check_trajectory_feasibility(trajectory, params)
+feasibility = check_trajectory_feasibility(trajectory, params, options)
+```
+
+**Inputs:**
+- `trajectory` - Trajectory structure from `generate_trajectory_*()`
+- `params` - Vehicle parameters from `quadrotor_linear_6dof()`
+- `options` (optional) - Options structure:
+  - `.verbose` - Print warnings (default: true)
+
+**Outputs:**
+- `feasibility` - Structure with fields:
+  - `.feasible` - Boolean: true if all checks pass
+  - `.warnings` - Cell array of warning strings
+  - `.violations` - Detailed violation metrics
+
+**Description:**
+
+Performs pre-flight validation of trajectory demands:
+
+1. **Yaw Rate Check**: Compares max/RMS yaw rates against:
+   - Warning threshold (50 deg/s) - controller may struggle
+   - Physical limit (τ_max / I_zz) - actuator saturation
+
+2. **Yaw Acceleration Check**: Validates against τ_max / I_zz
+
+3. **Attitude Angle Check**: Ensures linearization validity (<15 deg)
+
+4. **Velocity/Acceleration**: Logs for reference
+
+**Example:**
+```matlab
+% Load and check trajectory
+wpt = load_waypoints('figure_eight.wpt');
+trajectory = generate_trajectory_auto(wpt, params);
+feas = check_trajectory_feasibility(trajectory, params);
+
+if ~feas.feasible
+    fprintf('Max yaw rate: %.1f deg/s (limit: %.1f)\n', ...
+            feas.violations.max_yaw_rate, ...
+            feas.violations.limits.yaw_rate_warning);
+end
+```
+
+**See Also:** `generate_trajectory_auto`, `simulate_trajectory`
+
 ---
 
 ## Control Functions

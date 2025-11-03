@@ -1,4 +1,4 @@
-function [feasible, warnings] = check_trajectory_feasibility(trajectory, params)
+function [feasible, warnings, violations] = check_trajectory_feasibility(trajectory, params)
 % CHECK_TRAJECTORY_FEASIBILITY - Validate trajectory against vehicle/controller limits
 %
 % Checks if a generated trajectory is within the valid operating region for
@@ -81,6 +81,55 @@ function [feasible, warnings] = check_trajectory_feasibility(trajectory, params)
             'Trajectory demands excessive acceleration (%.2f m/s²) requiring >30° tilt. Max safe: %.2f m/s².', ...
             max_horiz_accel, max_accel_safe);
     end
+
+    %% Yaw Rate and Acceleration Checks (NEW)
+    dt = mean(diff(trajectory.time));
+    yaw_rate = gradient(trajectory.yaw, dt);
+    yaw_accel = gradient(yaw_rate, dt);
+    
+    % Physical limits
+    max_yaw_torque = params.u_max(4);  % N·m
+    Izz = params.Izz;  % kg·m²
+    max_yaw_accel_physical = max_yaw_torque / Izz;  % rad/s²
+    
+    % Practical limits for LQR tracking
+    YAW_RATE_WARNING = deg2rad(50);   % deg/s - above this, tracking degrades
+    YAW_RATE_CRITICAL = deg2rad(100); % deg/s - likely failure
+    YAW_ACCEL_LIMIT = 0.7 * max_yaw_accel_physical;  % 70% margin
+    YAW_RATE_RMS_LIMIT = deg2rad(20);  % Sustained rate limit
+    
+    max_yaw_rate = max(abs(yaw_rate));
+    max_yaw_accel = max(abs(yaw_accel));
+    rms_yaw_rate = rms(yaw_rate);
+    
+    % Yaw rate checks
+    if max_yaw_rate > YAW_RATE_CRITICAL
+        warnings{end+1} = sprintf(...
+            '🔴 CRITICAL: Yaw rate (%.1f°/s) far exceeds practical limit (%.1f°/s). Trajectory will likely fail.', ...
+            rad2deg(max_yaw_rate), rad2deg(YAW_RATE_CRITICAL));
+    elseif max_yaw_rate > YAW_RATE_WARNING
+        warnings{end+1} = sprintf(...
+            '⚠️ High yaw rate (%.1f°/s) exceeds recommended limit (%.1f°/s). May cause tracking issues.', ...
+            rad2deg(max_yaw_rate), rad2deg(YAW_RATE_WARNING));
+    end
+    
+    % Sustained yaw rate check
+    if rms_yaw_rate > YAW_RATE_RMS_LIMIT
+        warnings{end+1} = sprintf(...
+            '⚠️ Sustained yaw rate high (%.1f°/s RMS). Recommended: <%.1f°/s for extended maneuvers.', ...
+            rad2deg(rms_yaw_rate), rad2deg(YAW_RATE_RMS_LIMIT));
+    end
+    
+    % Yaw acceleration checks
+    if max_yaw_accel > max_yaw_accel_physical
+        warnings{end+1} = sprintf(...
+            '🔴 CRITICAL: Yaw acceleration (%.1f°/s²) exceeds physical limit (%.1f°/s²). Impossible to track.', ...
+            rad2deg(max_yaw_accel), rad2deg(max_yaw_accel_physical));
+    elseif max_yaw_accel > YAW_ACCEL_LIMIT
+        warnings{end+1} = sprintf(...
+            '⚠️ Yaw acceleration (%.1f°/s²) high. Recommended: <%.1f°/s² for control margin.', ...
+            rad2deg(max_yaw_accel), rad2deg(YAW_ACCEL_LIMIT));
+    end
     
     %% Angular Velocity Checks
     if isfield(trajectory, 'omega')
@@ -108,6 +157,26 @@ function [feasible, warnings] = check_trajectory_feasibility(trajectory, params)
             avg_speed, duration);
     end
     
+    %% Package Violations Structure
+    violations = struct();
+    violations.max_attitude = rad2deg(max_attitude);
+    violations.max_velocity = max_velocity;
+    violations.max_horiz_accel = max_horiz_accel;
+    violations.max_yaw_rate = rad2deg(max_yaw_rate);
+    violations.rms_yaw_rate = rad2deg(rms_yaw_rate);
+    violations.max_yaw_accel = rad2deg(max_yaw_accel);
+    violations.avg_speed = avg_speed;
+    
+    % Limits for reference
+    violations.limits = struct();
+    violations.limits.small_angle = rad2deg(SMALL_ANGLE_LIMIT);
+    violations.limits.velocity_warning = VELOCITY_WARNING;
+    violations.limits.accel_safe = max_accel_safe;
+    violations.limits.yaw_rate_warning = rad2deg(YAW_RATE_WARNING);
+    violations.limits.yaw_rate_critical = rad2deg(YAW_RATE_CRITICAL);
+    violations.limits.yaw_accel_physical = rad2deg(max_yaw_accel_physical);
+    violations.limits.yaw_accel_recommended = rad2deg(YAW_ACCEL_LIMIT);
+
     %% Overall Feasibility
     feasible = isempty(warnings);
     

@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "name": "Hover Test",
+    "description": "Stationary hover for validating stability and zero-motion control",
+    "author": "Trey Copeland",
+    "date": "2025-11-02"
+  },
+  "waypoints": [
+    {
+      "time": 0,
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "yaw": 0,
+      "comment": "Start: Hover at 1m altitude"
+    },
+    {
+      "time": 5,
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "yaw": 0,
+      "comment": "Hold position for 5 seconds"
+    },
+    {
+      "time": 10,
+      "x": 0,
+      "y": 0,
+      "z": 1,
+      "yaw": 0,
+      "comment": "Continue hover"
+    }
+  ]
+}

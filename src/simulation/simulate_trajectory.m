@@ -229,6 +229,23 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
         fprintf('  Max acceleration: %.2f m/s²\n', max(vecnorm(trajectory.acceleration, 2, 2)));
     end
     
+    [feasible, warnings, violations] = check_trajectory_feasibility(trajectory, params);
+
+    % Store in trajectory for later reporting
+    trajectory.feasibility = struct(...
+        'feasible', feasible, ...
+        'warnings', {warnings}, ...
+        'violations', violations);
+    
+    % Print warnings if verbose
+    if options.verbose && ~feasible
+        fprintf('\n⚠️⚠️⚠️ TRAJECTORY FEASIBILITY WARNINGS ⚠️⚠️⚠️\n');
+        for i = 1:length(warnings)
+            fprintf('%s\n', warnings{i});
+        end
+        fprintf('Simulation will proceed, but tracking may be poor.\n\n');
+    end
+
     %% ========================================================================
     %  STEP 5: SETUP INITIAL CONDITIONS
     %  ========================================================================
@@ -351,6 +368,18 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
     %  STEP 9: SAVE RESULTS
     %  ========================================================================
     
+    results = struct();
+    results.t = t;
+    results.x = x;
+    results.u_log = u_log;
+    results.trajectory = trajectory;
+    results.params = params;
+    results.params_plant = params_plant;
+    results.metrics = metrics;
+    results.config = struct('Q', params.Q, 'R', params.R, ...
+                           'x0', x0_full, 'dt', options.dt);
+    results.timestamp = datetime('now');
+
     if options.save_results
         % Create output directory
         output_dir = options.output_dir;
@@ -370,32 +399,20 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
         end
         
         % Create results subdirectory (matches MC structure)
-        timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+        timestamp = datestr(results.timestamp, 'yyyymmdd_HHMMSS');
         run_dir = fullfile(output_dir, sprintf('%s_%s', label, timestamp));
         if ~exist(run_dir, 'dir')
             mkdir(run_dir);
-        end
-        
-        % Prepare results structure
-        results_struct = struct();
-        results_struct.t = t;
-        results_struct.x = x;
-        results_struct.u_log = u_log;
-        results_struct.trajectory = trajectory;
-        results_struct.params = params;
-        results_struct.params_plant = params_plant;
-        results_struct.metrics = metrics;
-        results_struct.config = struct('Q', params.Q, 'R', params.R, ...
-                                       'x0', x0_full, 'dt', options.dt);
-        results_struct.timestamp = datetime('now');
+            results.output_dir = run_dir;
+        end       
         
         % Save .mat file IN THE SUBDIRECTORY
-        DataManager.save_results(results_struct, 'results', run_dir, ...
+        DataManager.save_results(results, 'results', run_dir, ...
             struct('verbose', verbose, 'timestamp', false));
         
         % Write metrics report IN THE SUBDIRECTORY
-        metrics_file = fullfile(run_dir, ANALYSIS_REPORT);
-        write_unified_metrics_report(results_struct, [], metrics_file);
+        metrics_file = fullfile(run_dir, Constants.ANALYSIS_REPORT);
+        write_unified_metrics_report(results, [], metrics_file);
         
         if verbose
             fprintf('Results saved: %s\n', run_dir);
@@ -511,26 +528,7 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
         if verbose
             fprintf('  Plots generated\n\n');
         end
-    end
-    
-    %% ========================================================================
-    %  STEP 11: RETURN RESULTS
-    %  ========================================================================
-    
-    if nargout > 0
-        results = struct();
-        results.t = t;
-        results.x = x;
-        results.u_log = u_log;
-        results.trajectory = trajectory;
-        results.params = params;
-        results.params_plant = params_plant;
-        results.metrics = metrics;
-        results.config = struct('Q', params.Q, 'R', params.R, ...
-                               'x0', x0_full, 'dt', options.dt);
-        results.timestamp = datetime('now');
-    end
-    
+    end    
 end
 
 function str = bool2str(value)

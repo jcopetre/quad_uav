@@ -1,0 +1,1 @@
+{"metadata":{"name":"MC Test Trajectory","description":"Minimal trajectory for testing"},"waypoints":[{"label":"start","time":0,"x":0,"y":0,"z":0,"yaw":0},{"label":"hover","time":3,"x":0,"y":0,"z":1,"yaw":[]},{"label":"end","time":6,"x":0,"y":0,"z":0,"yaw":0}]}

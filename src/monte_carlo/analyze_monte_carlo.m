@@ -104,6 +104,20 @@ function analysis = analyze_monte_carlo(mc_results, analysis_options)
         return;
     end
     
+    % Check if any trials had feasibility warnings
+    n_infeasible = 0;
+    for i = 1:length(trials)
+        if isfield(trials(i), 'trajectory') && ...
+           isfield(trials(i).trajectory, 'feasibility') && ...
+           ~trials(i).trajectory.feasibility.feasible
+            n_infeasible = n_infeasible + 1;
+        end
+    end
+    
+    statistics.trajectory_feasibility = struct(...
+        'n_infeasible', n_infeasible, ...
+        'pct_infeasible', 100 * n_infeasible / n_trials);
+
     %% Extract metrics from successful trials
     metrics_data = extract_metrics(successful_trials);
     

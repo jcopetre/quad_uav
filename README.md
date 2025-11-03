@@ -35,6 +35,8 @@ simulate_trajectory('basic_maneuver.wpt')
 - [Architecture Overview](./doc/architecture.md) - System design and data flow
 - [API Reference](./doc/api_reference.md) - Complete function documentation
 - [Monte Carlo Guide](./doc/monte_carlo_guide.md) - Robustness analysis workflow
+- [Trajectory Generation](./doc/trajectory_generation_overview.md) - Technical deep dive on trajectory methods
+- [Trajectory Design Examples](./doc/trajectory_design_examples.md) - Practical waypoint design patterns
 
 ## 📁 Project Structure
 
@@ -59,6 +61,7 @@ simulate_trajectory('basic_maneuver.wpt')
 ## ✨ Key Features
 
 - **Intelligent Trajectory Generation**: Automatic method selection (MAKIMA interpolation vs. minimum snap optimization) based on waypoint timing
+- **Trajectory Feasibility Checking**: Pre-flight validation of yaw rate/acceleration demands against vehicle constraints
 - **Robust LQR Control**: Linearized control with comprehensive feasibility checking
 - **Monte Carlo Analysis**: Parallel parameter perturbation studies with statistical analysis
 - **Data Validation**: Strict data contracts ensure simulation integrity
@@ -111,6 +114,11 @@ Success:            ✓ YES
 cd test
 run_tests  % Runs 61+ unit and integration tests
 ```
+## Standard Test Trajectories
+
+- `hover_test.wpt` - Stationary hover (10s) for stability validation
+- `simple_square.wpt` - Basic square pattern for integration testing
+- `figure_eight_long.wpt` - Aggressive maneuver for stress testing
 
 ## 🔬 Monte Carlo Robustness Analysis
 
