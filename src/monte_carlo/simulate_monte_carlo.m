@@ -111,6 +111,30 @@ function results_dir = simulate_monte_carlo(trajectory_file, run_label, perturb_
     DataManager.save_monte_carlo(mc_results, results_dir, ...
         struct('validate', true, 'verbose', mc_options.verbose));
     
+    %% Copy waypoint file for reproducibility
+    if mc_options.verbose
+        fprintf('Copying waypoint file...\n');
+    end
+    
+    % Find trajectory file path
+    init_path = which('init_project');
+    if isempty(init_path)
+        warning('Cannot find project root for waypoint file copy');
+    else
+        project_root = fileparts(init_path);
+        trajectory_path = fullfile(project_root, 'trajectories', trajectory_file);
+        
+        if exist(trajectory_path, 'file')
+            wpt_dest = fullfile(results_dir, trajectory_file);
+            copyfile(trajectory_path, wpt_dest);
+            if mc_options.verbose
+                fprintf('  Waypoint file: %s\n', wpt_dest);
+            end
+        else
+            warning('Waypoint file not found: %s', trajectory_path);
+        end
+    end
+
     %% Generate metrics file
     if mc_options.verbose
         fprintf('Writing run log...\n');
