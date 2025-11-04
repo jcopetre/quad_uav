@@ -47,13 +47,16 @@ function write_unified_metrics_report(results, mc_results, output_file)
             write_mc_statistics(fid, mc_results);
             write_sensitivity(fid, mc_results);
     
-            fprintf(fid, '\nMONTE CARLO TRAJECTORY FEASIBILITY\n');
-            fprintf(fid, '-----------------------------------------------------------------\n');
-            fprintf(fid, 'Trials with feasibility warnings: %d / %d (%.1f%%)\n', ...
-                    mc_results.statistics.trajectory_feasibility.n_infeasible, ...
-                    mc_results.statistics.n_trials, ...
-                    mc_results.statistics.trajectory_feasibility.pct_infeasible);
-            fprintf(fid, '\n');
+            % Trajectory feasibility (if tracked)
+            if isfield(mc_results.statistics, 'trajectory_feasibility')
+                fprintf(fid, '\nMONTE CARLO TRAJECTORY FEASIBILITY\n');
+                fprintf(fid, '-----------------------------------------------------------------\n');
+                fprintf(fid, 'Trials with feasibility warnings: %d / %d (%.1f%%)\n', ...
+                        mc_results.statistics.trajectory_feasibility.n_infeasible, ...
+                        mc_results.statistics.n_trials, ...
+                        mc_results.statistics.trajectory_feasibility.pct_infeasible);
+                fprintf(fid, '\n');
+            end
         end
         
         write_footer(fid);
