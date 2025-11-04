@@ -137,6 +137,11 @@ function mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_option
     opts_nominal.plot = false;
     opts_nominal.params = params_nominal;
     
+    % TODO: use default options style for opts_nominal
+    if isfield(mc_options, 'method')
+        opts_nominal.method = mc_options.method;
+    end
+
     try
         results_nominal = simulate_trajectory(trajectory_file, [], [], [], opts_nominal);
         nominal_success = true;
@@ -173,6 +178,10 @@ function mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_option
     opts_sim.save_results = false;
     opts_sim.plot = false;
     
+    if isfield(mc_options, 'method')
+        opts_sim.method = mc_options.method;
+    end
+
     % Progress reporting setup
     if mc_options.verbose
         progress_interval = max(1, floor(N_trials / 20));  % Report every 5%
@@ -226,6 +235,19 @@ function mc_results = run_monte_carlo(trajectory_file, perturb_config, mc_option
     mc_results.trials = trials;
     mc_results.statistics = statistics;
     mc_results.timestamp = datetime('now');
+
+    % Aggregate trajectory feasibility across trials
+    n_infeasible = 0;
+    for i = 1:length(trials)
+        if isfield(trials(i), 'feasibility') && ~trials(i).feasibility.feasible
+            n_infeasible = n_infeasible + 1;
+        end
+    end
+    
+    mc_results.statistics.trajectory_feasibility = struct(...
+        'n_infeasible', n_infeasible, ...
+        'pct_infeasible', 100 * n_infeasible / mc_options.N_trials);
+
     mc_results.elapsed_time = toc;
     
     %% Summary report
@@ -364,6 +386,14 @@ function trial = run_single_trial(trial_num, trajectory_file, params_perturbed, 
         
         % Store results
         trial.metrics = results.metrics;
+        
+        % Store trajectory feasibility for MC analysis
+        if isfield(results, 'trajectory') && isfield(results.trajectory, 'feasibility')
+            trial.feasibility = results.trajectory.feasibility;
+        else
+            trial.feasibility = struct('feasible', true, 'warnings', {{}});
+        end
+        
         trial.success = true;
         trial.failure_msg = '';
         
@@ -381,6 +411,7 @@ function trial = run_single_trial(trial_num, trajectory_file, params_perturbed, 
     catch ME
         % Trial failed (e.g., unstable, integration error)
         trial.metrics = struct();
+        trial.feasibility = struct('feasible', false, 'warnings', {{'Simulation failed'}});
         trial.success = false;
         trial.failure_msg = ME.message;
         trial.t = [];

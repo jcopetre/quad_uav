@@ -32,6 +32,7 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
 %                      .plot          - Show plots (default: true if no output)
 %                      .dt            - Trajectory timestep (default: 0.01 s)
 %                      .output_dir    - Where to save results (default: './results')
+%                      .method        - Force trajectory method: 'auto', 'makima', 'minsnap' (default: 'auto')
 %                      .params_plant  - Plant parameters if different from nominal
 %                                       Primary use case: Monte Carlo simulations where
 %                                       you want to test perturbed plant dynamics against
@@ -124,7 +125,8 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
     defaults.dt = 0.01;
     defaults.output_dir = './results';  % Default to standard results directory
     defaults.params_plant = [];  % Use same as controller by default
-    
+    defaults.method = 'auto';
+
     options = set_default_options(options, defaults);
     
     verbose = options.verbose;
@@ -220,7 +222,16 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
         fprintf('\nStep 3/6: Generating trajectory...\n');
     end
     
-    trajectory = generate_trajectory_auto(wpt, params, options.dt);
+    % SELECT METHOD BASED ON OPTIONS
+    if strcmpi(options.method, 'makima')
+        trajectory = generate_trajectory_interp(wpt, params, options.dt);
+    elseif strcmpi(options.method, 'minsnap')
+        trajectory = generate_trajectory_minsnap(wpt, params, options.dt);
+    else
+        % Auto-selection (default)
+        trajectory = generate_trajectory_auto(wpt, params, options.dt);
+    end
+    
     trajectory.filename = trajectory_file;
     
     if verbose

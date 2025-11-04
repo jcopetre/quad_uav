@@ -39,7 +39,7 @@ TRAJECTORY_FILE = 'figure_eight_long.wpt';
 
 VERBOSE = false;
 PARALLEL = true;
-N_TRIALS = 10;
+N_TRIALS = 2000;
 
 % Run identifier (used in directory naming)
 [~, base_name, ~] = fileparts(TRAJECTORY_FILE);
@@ -50,6 +50,7 @@ mc_options = struct();
 mc_options.N_trials = N_TRIALS;         % Number of trials (use 500+ for real studies)
 mc_options.parallel = PARALLEL;         % Use parallel processing
 mc_options.verbose = VERBOSE;           % Show progress
+mc_options.method = 'makima';           % 'makima', 'minsnap' or comment out for 'auto'
 
 % Optional: Define custom parameter uncertainties
 % If left commented, simulate_monte_carlo uses sensible defaults
@@ -169,7 +170,7 @@ fprintf('\n');
 % Load and display key metrics
 fprintf('Quick metrics preview:\n');
 fprintf('----------------------------------------------------------------\n');
-nominal_file = fullfile(results_dir, NOMINAL_DATA);
+nominal_file = fullfile(results_dir, Constants.NOMINAL_DATA);
 if exist(nominal_file, 'file')
     nominal = DataManager.load_results(nominal_file);
     if isfield(nominal, 'metrics') && isfield(nominal.metrics, 'tracking')

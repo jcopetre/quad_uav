@@ -43,6 +43,10 @@ function trajectory = generate_trajectory_auto(waypoints, params, dt)
 %   traj = generate_trajectory_minsnap(wpt, params);  % Force minsnap
 %   traj = generate_trajectory_interp(wpt, params);   % Force interpolation
 %
+%   Or override in simulate_trajectory:
+%       opts.method = 'makima';
+%       simulate_trajectory('trajectory.wpt', [], [], [], opts);
+%
 % See also: generate_trajectory_minsnap, generate_trajectory_interp
 
 % Author: Trey Copeland
