@@ -9,7 +9,7 @@ init_project();
 %% Example 1: Basic simulation with defaults
 fprintf('Example 1: Basic simulation\n');
 fprintf('----------------------------\n');
-simulate_trajectory('aggressive_racing.wpt');
+simulate_trajectory('figure_eight_long.wpt');
 
 %% Example 2: Custom LQR tuning
 % fprintf('\nExample 2: Custom aggressive tuning\n');

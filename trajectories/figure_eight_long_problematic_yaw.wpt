@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "name": "Figure Eight Pattern (Long Segments)",
+    "description": "Figure-eight with 4s segments for fair minsnap comparison",
+    "created": "2025-10-13",
+    "vehicle": "quadrotor_500g",
+    "notes": "Designed with ≥3s segments to allow valid minimum snap optimization"
+  },
+  "waypoints": [
+    {"label": "start_rest", "time": 0, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": 0.0},
+    {"label": "right_begin", "time": 4, "x": 1.0, "y": 0.5, "z": 1.5, "yaw": null},
+    {"label": "right_peak", "time": 8, "x": 2.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "right_bottom", "time": 12, "x": 1.0, "y": -0.5, "z": 1.5, "yaw": null},
+    {"label": "center_cross", "time": 16, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "left_bottom", "time": 20, "x": -1.0, "y": -0.5, "z": 1.5, "yaw": null},
+    {"label": "left_peak", "time": 24, "x": -2.0, "y": 0.0, "z": 1.5, "yaw": null},
+    {"label": "left_top", "time": 28, "x": -1.0, "y": 0.5, "z": 1.5, "yaw": null},
+    {"label": "end_rest", "time": 32, "x": 0.0, "y": 0.0, "z": 1.5, "yaw": 0.0}
+  ]
+}
