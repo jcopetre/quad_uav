@@ -221,6 +221,7 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
     end
     
     trajectory = generate_trajectory_auto(wpt, params, options.dt);
+    trajectory.filename = trajectory_file;
     
     if verbose
         fprintf('  Method selected: %s\n', trajectory.method);
@@ -414,6 +415,15 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
         metrics_file = fullfile(run_dir, Constants.ANALYSIS_REPORT);
         write_unified_metrics_report(results, [], metrics_file);
         
+        % Copy waypoint file to results directory for reproducibility
+        if is_filename && exist(trajectory_path, 'file')
+            wpt_dest = fullfile(run_dir, trajectory_file);
+            copyfile(trajectory_path, wpt_dest);
+            if verbose
+                fprintf('  Waypoints: %s\n', wpt_dest);
+            end
+        end
+
         if verbose
             fprintf('Results saved: %s\n', run_dir);
             fprintf('  Data:    %s\n', fullfile(run_dir, Constants.SINGLE_RUN_DATA));
@@ -523,7 +533,7 @@ function results = simulate_trajectory(trajectory_input, Q, R, x0, options)
         title('Position Tracking Error');
         
         sgtitle(sprintf('Trajectory Tracking Results: %s', trajectory_file), ...
-                'FontSize', 14, 'FontWeight', 'bold');
+                'FontSize', 14, 'FontWeight', 'bold', 'Interpreter', 'none');
         
         if verbose
             fprintf('  Plots generated\n\n');
