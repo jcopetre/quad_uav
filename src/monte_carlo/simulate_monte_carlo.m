@@ -40,7 +40,7 @@ function results_dir = simulate_monte_carlo(trajectory_file, run_label, perturb_
 %   results_dir = simulate_monte_carlo('simple_square.wpt', 'paper_final');
 %   
 %   % Later, generate figures
-%   generate_paper_outputs(results_dir);
+%   generate_standard_outputs(results_dir);
 %
 % See also: run_monte_carlo, generate_paper_figures
 
@@ -151,7 +151,7 @@ function results_dir = simulate_monte_carlo(trajectory_file, run_label, perturb_
         fprintf('Results saved to: %s\n', results_dir);
         fprintf('\nNext steps:\n');
         fprintf('  1. Review metrics: edit %s\n', log_file);
-        fprintf('  2. Generate figures: generate_paper_outputs(''%s'')\n', results_dir);
+        fprintf('  2. Generate figures: generate_standard_outputs(''%s'')\n', results_dir);
         fprintf('================================================================\n\n');
     end
 end

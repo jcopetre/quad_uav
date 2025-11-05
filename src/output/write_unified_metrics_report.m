@@ -187,7 +187,7 @@ end
 function write_performance(fid, results, has_mc)
     % Write performance results section
     % EXTRACTED FROM: simulate_monte_carlo.m lines 300-314
-    %                 generate_paper_outputs.m lines 610-673
+    %                 generate_standard_outputs.m lines 610-673
     
     if has_mc
         fprintf(fid, 'NOMINAL SIMULATION (Baseline)\n');
@@ -283,7 +283,7 @@ end
 function write_mc_statistics(fid, mc_results)
     % Write Monte Carlo statistics section
     % EXTRACTED FROM: simulate_monte_carlo.m lines 286-339
-    %                 generate_paper_outputs.m lines 625-690
+    %                 generate_standard_outputs.m lines 625-690
     
     fprintf(fid, 'MONTE CARLO ROBUSTNESS ANALYSIS\n');
     fprintf(fid, '-----------------------------------------------------------------\n');
@@ -384,7 +384,7 @@ end
 
 function write_sensitivity(fid, mc_results)
     % Write sensitivity analysis section
-    % EXTRACTED FROM: generate_paper_outputs.m lines 634-673
+    % EXTRACTED FROM: generate_standard_outputs.m lines 634-673
     
     % Check if we have analysis results
     if ~isfield(mc_results, 'statistics') || ~isfield(mc_results.statistics, 'correlations')

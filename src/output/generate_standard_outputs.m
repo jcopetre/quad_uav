@@ -1,9 +1,9 @@
-function generate_paper_outputs(results_dir, options)
+function generate_standard_outputs(results_dir, options)
 % GENERATE_PAPER_FIGURES Creates publication-quality figures from saved simulation data
 %
 % SYNTAX:
-%   generate_paper_outputs(results_dir)
-%   generate_paper_outputs(results_dir, options)
+%   generate_standard_outputs(results_dir)
+%   generate_standard_outputs(results_dir, options)
 %
 % INPUTS:
 %   results_dir - Path to results directory containing nominal.mat and monte_carlo.mat
@@ -27,11 +27,11 @@ function generate_paper_outputs(results_dir, options)
 % EXAMPLE:
 %   % After running simulate_monte_carlo
 %   results_dir = simulate_monte_carlo('simple_square.wpt', 'paper_final');
-%   generate_paper_outputs(results_dir);
+%   generate_standard_outputs(results_dir);
 %
 %   % With options
 %   opts.close_figures = false;  % Keep figures open
-%   generate_paper_outputs(results_dir, opts);
+%   generate_standard_outputs(results_dir, opts);
 %
 % See also: simulate_monte_carlo, analyze_monte_carlo_results
 

@@ -82,7 +82,7 @@ function write_run_log(mc_results, nominal, output_file)
         fprintf(fid, '  - monte_carlo.mat\n');
         fprintf(fid, '\n');
         fprintf(fid, 'Next step:\n');
-        fprintf(fid, '  Run generate_paper_outputs() to analyze results and generate\n');
+        fprintf(fid, '  Run generate_standard_outputs() to analyze results and generate\n');
         fprintf(fid, '  comprehensive metrics report with correlations and figures.\n');
         fprintf(fid, '=================================================================\n');
         

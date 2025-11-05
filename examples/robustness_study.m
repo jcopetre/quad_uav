@@ -143,7 +143,7 @@ fig_options.close_figures = true;  % Close figures after saving
 fig_options.verbose = true;
 
 % Generate figures - uses results_dir directly!
-generate_paper_outputs(results_dir, fig_options);
+generate_standard_outputs(results_dir, fig_options);
 
 fprintf('\n');
 
@@ -207,7 +207,7 @@ fprintf('✓ Figures created\n');
 fprintf('✓ Metrics computed\n');
 fprintf('\n');
 fprintf('To regenerate figures with different styling:\n');
-fprintf('  >> generate_paper_outputs(''%s'')\n', results_dir);
+fprintf('  >> generate_standard_outputs(''%s'')\n', results_dir);
 fprintf('\n');
 fprintf('To view figures:\n');
 fprintf('  >> cd %s\n', figures_dir);
